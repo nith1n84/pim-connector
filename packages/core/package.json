@@ -8,5 +8,8 @@
   "scripts": {
     "build": "tsc",
     "watch": "tsc -w"
+  },
+  "dependencies": {
+    "zod": "^4.3.6"
   }
 }

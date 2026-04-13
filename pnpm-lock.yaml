@@ -51,7 +51,11 @@ importers:
         specifier: ^14.0.3
         version: 14.0.3
 
-  packages/core: {}
+  packages/core:
+    dependencies:
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
 
 packages:
 
@@ -178,6 +182,9 @@ packages:
   undici-types@7.19.2:
     resolution: {integrity: sha512-qYVnV5OEm2AW8cJMCpdV20CDyaN3g0AjDlOGf1OW4iaDEx8MwdtChUp4zu4H0VP3nDRF/8RKWH+IPp9uW0YGZg==}
 
+  zod@4.3.6:
+    resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
+
 snapshots:
 
   '@graphql-typed-document-node/core@3.2.0(graphql@16.13.2)':
@@ -294,3 +301,5 @@ snapshots:
   typescript@5.9.3: {}
 
   undici-types@7.19.2: {}
+
+  zod@4.3.6: {}
