@@ -30,6 +30,9 @@ export class SyncEngine {
 
       await this.syncProducts(sourceProducts);
 
+      // Save identity map persistence
+      await this.identityMap.save();
+
       this.logger.info("Full sync completed successfully.");
     } catch (error) {
       this.logger.error("Full sync failed:", error);
@@ -53,6 +56,9 @@ export class SyncEngine {
 
       await this.syncProducts(updatedProducts);
 
+      // Save identity map persistence
+      await this.identityMap.save();
+
       this.logger.info("Incremental sync completed successfully.");
     } catch (error) {
       this.logger.error("Incremental sync failed:", error);
@@ -71,17 +77,22 @@ export class SyncEngine {
       try {
         const transformed: Product = transformData(sourceProduct, this.mapping);
         
-        // Log basic info
-        this.logger.info(`${this.options.dryRun ? '[DRY-RUN] ' : ''}Syncing product: ${transformed.sku} (${transformed.name})`);
+        // 1. Check local identity map
+        const sourceId = sourceProduct.id || transformed.sku;
+        const targetId = this.identityMap.getTargetId(sourceId);
+
+        // Log action
+        const action = targetId ? "Updating" : "Creating";
+        this.logger.info(`${this.options.dryRun ? '[DRY-RUN] ' : ''}${action} product: ${transformed.sku} (${transformed.name})`);
 
         if (!this.options.dryRun) {
-          await this.target.upsertProduct(transformed);
+          const newTargetId = await this.target.upsertProduct(transformed, targetId);
           
           // Track in identity map
-          this.identityMap.setMapping(sourceProduct.id || transformed.sku, transformed.sku);
+          this.identityMap.setMapping(sourceId, newTargetId);
           successCount++;
         } else {
-          this.logger.info(`[DRY-RUN] Skipped upsert for ${transformed.sku}`);
+          this.logger.info(`[DRY-RUN] Skipped sync for ${transformed.sku}`);
           successCount++;
         }
 

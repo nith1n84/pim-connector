@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { parseArgs } from "node:util";
 import {
   BasicLogger,
@@ -77,7 +77,11 @@ Options:
     retries: config.syncOptions?.retries,
     retryDelayMs: config.syncOptions?.retryDelayMs,
   });
-  const identityMap = new IdentityMap();
+
+  // Initialize identity map with persistence
+  const identitiesPath = join(dirname(configPath), "identities.json");
+  const identityMap = new IdentityMap(identitiesPath);
+  await identityMap.load();
 
   await source.initialize();
   await target.initialize();

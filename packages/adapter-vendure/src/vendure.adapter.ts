@@ -72,14 +72,12 @@ export class VendureAdapter implements TargetAdapter {
     return attempt(maxRetries, initialDelay);
   }
 
-  async upsertProduct(product: Product): Promise<void> {
-    const existingProduct = await this.findProductBySku(product.sku);
+  async upsertProduct(product: Product, targetId?: string): Promise<string> {
+    const existingProduct = targetId ? { id: targetId } : await this.findProductBySku(product.sku);
 
     let productId: string;
     if (existingProduct) {
-      console.log(
-        `Updating existing product ${product.sku} (ID: ${existingProduct.id})`,
-      );
+      console.log(`Updating existing product ${product.sku} (ID: ${existingProduct.id})`);
       const updateInput = this.mapper.mapToUpdateProductInput(
         existingProduct.id,
         product,
@@ -102,9 +100,11 @@ export class VendureAdapter implements TargetAdapter {
       await this.upsertVariants(
         productId,
         product.variants,
-        existingProduct?.variants,
+        (existingProduct as any)?.variants,
       );
     }
+
+    return productId;
   }
 
   private async findProductBySku(sku: string): Promise<any | null> {

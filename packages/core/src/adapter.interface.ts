@@ -12,7 +12,7 @@ export interface SourceAdapter {
 export interface TargetAdapter {
   name: string;
   initialize(): Promise<void>;
-  upsertProduct(product: Product): Promise<void>;
+  upsertProduct(product: Product, targetId?: string): Promise<string>;
   upsertAsset(asset: Asset): Promise<void>;
 }
 
