@@ -1,0 +1,16 @@
+{
+  "name": "pim-connector",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "Modular PIM-to-commerce integration platform",
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "typescript": "^5.4.0"
+  }
+}

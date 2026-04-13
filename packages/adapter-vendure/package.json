@@ -1,0 +1,16 @@
+{
+  "name": "@pim-connector/adapter-vendure",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@pim-connector/core": "workspace:*",
+    "graphql": "^16.13.2",
+    "graphql-request": "^7.4.0"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "source": {
+    "adapter": "akeneo",
+    "config": {
+      "url": "https://your-akeneo-domain.com",
+      "clientId": "your_client_id",
+      "secret": "your_secret",
+      "username": "your_username",
+      "password": "your_password"
+    }
+  },
+  "target": {
+    "adapter": "vendure",
+    "config": {
+      "url": "http://localhost:3000/admin-api",
+      "token": "your_vendure_token"
+    }
+  },
+  "mapping": {
+    "attributeMap": [
+      { "source": "sku", "target": "sku" },
+      { "source": "description", "target": "description" }
+    ]
+  }
+}
