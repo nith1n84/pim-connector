@@ -14,14 +14,14 @@ A modular synchronization platform to connect **Akeneo Cloud PIM** with **Vendur
 The platform follows a decoupled adapter pattern using a **Canonical Data Model (CDM)**. This ensures that adding a new PIM or Commerce target only requires a new adapter without touching the core sync logic.
 
 ```mermaid
-graph TD
+flowchart TD
     A[Akeneo Source] -->|Raw Data| B(Source Adapter)
     B -->|CDM Transformation| C{Sync Engine}
     C -->|Validated CDM| D(Target Adapter)
     D -->|GraphQL/REST| E[Vendure Target]
     
     C -.->|Track IDs| F[(Identity Map)]
-    G[connector.config.json] -->|Configuration| C
+    G["connector.config.json"] -->|Configuration| C
 ```
 
 - **Core**: Orchestrates the flow and handles data mapping.
