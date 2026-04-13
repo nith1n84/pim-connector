@@ -21,5 +21,10 @@
       { "source": "sku", "target": "sku" },
       { "source": "description", "target": "description" }
     ]
+  },
+  "syncOptions": {
+    "delayMs": 500,
+    "retries": 3,
+    "retryDelayMs": 1000
   }
 }

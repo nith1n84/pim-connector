@@ -2,19 +2,25 @@ import { gql } from 'graphql-request';
 
 export interface VendureConfig {
   url: string;
-  token: string;
+  token?: string;
+  email?: string;
+  password?: string;
+  retries?: number;
+  retryDelayMs?: number;
 }
 
-export const GET_PRODUCT_BY_SKU = gql`
-  query GetProductBySku($sku: String!) {
-    products(options: { filter: { sku: { eq: $sku } } }) {
+export const GET_PRODUCT_BY_VARIANT_SKU = gql`
+  query GetProductByVariantSku($sku: String!) {
+    productVariants(options: { filter: { sku: { eq: $sku } } }) {
       items {
-        id
-        name
-        slug
-        variants {
+        product {
           id
-          sku
+          name
+          slug
+          variants {
+            id
+            sku
+          }
         }
       }
     }
@@ -54,6 +60,20 @@ export const UPDATE_PRODUCT_VARIANTS = gql`
     updateProductVariants(input: $input) {
       id
       sku
+    }
+  }
+`;
+
+export const LOGIN = gql`
+  mutation Login($username: String!, $password: String!) {
+    login(username: $username, password: $password) {
+      ... on CurrentUser {
+        id
+        identifier
+      }
+      ... on InvalidCredentialsError {
+        message
+      }
     }
   }
 `;

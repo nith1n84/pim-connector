@@ -21,7 +21,11 @@ async function main() {
   }
 
   const source = new AkeneoAdapter(config.source.config);
-  const target = new VendureAdapter(config.target.config);
+  const target = new VendureAdapter({
+    ...config.target.config,
+    retries: config.syncOptions?.retries,
+    retryDelayMs: config.syncOptions?.retryDelayMs,
+  });
   const identityMap = new IdentityMap();
 
   await source.initialize();
@@ -35,6 +39,9 @@ async function main() {
 
   for (const product of products) {
     await target.upsertProduct(product);
+    // Add small delay to prevent SQLite locks during heavy writes
+    const delay = config.syncOptions?.delayMs ?? 500;
+    await new Promise(resolve => setTimeout(resolve, delay));
   }
 
   logger.info("Sync completed.");
