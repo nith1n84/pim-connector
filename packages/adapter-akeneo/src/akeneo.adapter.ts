@@ -18,34 +18,33 @@ export class AkeneoAdapter implements SourceAdapter {
     console.log("Akeneo Adapter initialized");
   }
 
-  async getProducts(): Promise<Product[]> {
-    const products: Product[] = [];
+  async getProducts(): Promise<any[]> {
+    const products: any[] = [];
     const iterator = this.client.paginate<AkeneoProduct>(
       "/api/rest/v1/products",
     );
 
     for await (const items of iterator) {
-      const mapped = items.map((item) => this.mapper.mapToProduct(item));
-      products.push(...mapped);
+      products.push(...items);
     }
 
     return products;
   }
 
-  async getProduct(id: string): Promise<Product | null> {
+  async getProduct(id: string): Promise<any | null> {
     try {
       const resp = await this.client.request<AkeneoProduct>({
         url: `/api/rest/v1/products/${id}`,
         method: "GET",
       });
-      return this.mapper.mapToProduct(resp);
+      return resp;
     } catch (error) {
       return null;
     }
   }
 
-  async getUpdatedProducts(since: Date): Promise<Product[]> {
-    const products: Product[] = [];
+  async getUpdatedProducts(since: Date): Promise<any[]> {
+    const products: any[] = [];
     // Akeneo filters use JSON format in query params
     const searchFilter = {
       updated: [
@@ -64,8 +63,7 @@ export class AkeneoAdapter implements SourceAdapter {
     );
 
     for await (const items of iterator) {
-      const mapped = items.map((item) => this.mapper.mapToProduct(item));
-      products.push(...mapped);
+      products.push(...items);
     }
 
     return products;

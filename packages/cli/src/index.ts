@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { BasicLogger, IdentityMap } from "@pim-connector/core";
+import { BasicLogger, IdentityMap, SyncEngine } from "@pim-connector/core";
 import { AkeneoAdapter } from "@pim-connector/adapter-akeneo";
 import { VendureAdapter } from "@pim-connector/adapter-vendure";
 
@@ -31,18 +31,16 @@ async function main() {
   await source.initialize();
   await target.initialize();
 
-  logger.info("Adapters initialized. Ready for sync.");
+  const engine = new SyncEngine(
+    source,
+    target,
+    config.mapping.attributeMap || {}, // Use mapping from config
+    identityMap,
+    logger,
+    { delayMs: config.syncOptions?.delayMs }
+  );
 
-  // Placeholder for sync logic
-  const products = await source.getProducts();
-  logger.info(`Found ${products.length} products to sync.`);
-
-  for (const product of products) {
-    await target.upsertProduct(product);
-    // Add small delay to prevent SQLite locks during heavy writes
-    const delay = config.syncOptions?.delayMs ?? 500;
-    await new Promise(resolve => setTimeout(resolve, delay));
-  }
+  await engine.runFullSync();
 
   logger.info("Sync completed.");
 }

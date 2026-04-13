@@ -10,9 +10,9 @@ export class VendureMapper {
       translations: [
         {
           languageCode: 'en', // Hardcoded for now as per requirements
-          name: product.name,
-          slug: this.sluggify(product.name),
-          description: product.description,
+          name: product.name || product.sku || 'Unknown Product',
+          slug: this.sluggify(product.name || product.sku || ''),
+          description: product.description || '',
         },
       ],
       // customFields: { externalId: product.id } // Optional: if externalId custom field exists
@@ -29,9 +29,9 @@ export class VendureMapper {
       translations: [
         {
           languageCode: 'en',
-          name: product.name,
-          slug: this.sluggify(product.name),
-          description: product.description,
+          name: product.name || product.sku || 'Unknown Product',
+          slug: this.sluggify(product.name || product.sku || ''),
+          description: product.description || '',
         },
       ],
     };
@@ -72,6 +72,7 @@ export class VendureMapper {
   }
 
   private sluggify(text: string): string {
+    if (!text) return 'product-' + Math.random().toString(36).substring(7);
     return text
       .toLowerCase()
       .replace(/[^\w ]+/g, '')

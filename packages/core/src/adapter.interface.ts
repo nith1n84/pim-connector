@@ -3,10 +3,10 @@ import { Product, Asset } from "./cdm.types.js";
 export interface SourceAdapter {
   name: string;
   initialize(): Promise<void>;
-  getProducts(): Promise<Product[]>;
-  getProduct(id: string): Promise<Product | null>;
-  getUpdatedProducts(since: Date): Promise<Product[]>;
-  getAssets(): Promise<Asset[]>;
+  getProducts(): Promise<any[]>;
+  getProduct(id: string): Promise<any | null>;
+  getUpdatedProducts(since: Date): Promise<any[]>;
+  getAssets(): Promise<any[]>;
 }
 
 export interface TargetAdapter {
