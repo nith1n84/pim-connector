@@ -5,6 +5,7 @@ import { Product } from "./cdm.types.js";
 
 export interface SyncOptions {
   delayMs?: number;
+  dryRun?: boolean;
 }
 
 export class SyncEngine {
@@ -71,14 +72,18 @@ export class SyncEngine {
         const transformed: Product = transformData(sourceProduct, this.mapping);
         
         // Log basic info
-        this.logger.info(`Syncing product: ${transformed.sku} (${transformed.name})`);
+        this.logger.info(`${this.options.dryRun ? '[DRY-RUN] ' : ''}Syncing product: ${transformed.sku} (${transformed.name})`);
 
-        await this.target.upsertProduct(transformed);
-        
-        // Track in identity map
-        this.identityMap.setMapping(sourceProduct.id || transformed.sku, transformed.sku);
-
-        successCount++;
+        if (!this.options.dryRun) {
+          await this.target.upsertProduct(transformed);
+          
+          // Track in identity map
+          this.identityMap.setMapping(sourceProduct.id || transformed.sku, transformed.sku);
+          successCount++;
+        } else {
+          this.logger.info(`[DRY-RUN] Skipped upsert for ${transformed.sku}`);
+          successCount++;
+        }
 
         // Apply throttle delay if configured
         if (this.options.delayMs) {

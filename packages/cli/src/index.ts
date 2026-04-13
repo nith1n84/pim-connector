@@ -1,24 +1,58 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { parseArgs } from "node:util";
 import { BasicLogger, IdentityMap, SyncEngine } from "@pim-connector/core";
 import { AkeneoAdapter } from "@pim-connector/adapter-akeneo";
 import { VendureAdapter } from "@pim-connector/adapter-vendure";
 
 async function main() {
-  const logger = new BasicLogger("CLI");
-  logger.info("Starting PIM Connector...");
+  const { values, positionals } = parseArgs({
+    options: {
+      since: { type: "string" },
+      "dry-run": { type: "boolean", short: "d" },
+      help: { type: "boolean", short: "h" },
+    },
+    allowPositionals: true,
+  });
 
-  // Load configuration
-  const configPath = join(process.cwd(), "../../connector.config.json");
-  let config;
+  const logger = new BasicLogger("CLI");
+  let config: any;
+
+  if (values.help || positionals.length === 0 || positionals[0] !== "sync") {
+    console.log(`
+Usage: pim-sync sync [options]
+
+Commands:
+  sync                 Run the synchronization engine
+
+Options:
+  --since <date>      Run incremental sync since date (ISO format)
+  --dry-run, -d       Run without writing to target
+  --help, -h          Show help
+    `);
+    process.exit(0);
+  }
+
+  logger.info(`Starting PIM Connector... ${values["dry-run"] ? "(DRY RUN)" : ""}`);
+
+  // Load configuration - handle running from root or packages/cli
+  let configPath = join(process.cwd(), "connector.config.json");
+  
+  // If not found in current dir, check one level up (common for pnpm workspaces)
   try {
     const configData = await readFile(configPath, "utf-8");
     config = JSON.parse(configData);
-    logger.info("Configuration loaded from connector.config.json");
-  } catch (error) {
-    logger.error(`Failed to load configuration from ${configPath}`);
-    process.exit(1);
+  } catch (err) {
+    configPath = join(process.cwd(), "../../connector.config.json");
+    try {
+      const configData = await readFile(configPath, "utf-8");
+      config = JSON.parse(configData);
+    } catch (error) {
+      logger.error(`Could not find connector.config.json in current or parent directories.`);
+      process.exit(1);
+    }
   }
+  logger.info("Configuration loaded successfully");
 
   const source = new AkeneoAdapter(config.source.config);
   const target = new VendureAdapter({
@@ -34,15 +68,27 @@ async function main() {
   const engine = new SyncEngine(
     source,
     target,
-    config.mapping.attributeMap || {}, // Use mapping from config
+    config.mapping.attributeMap || {},
     identityMap,
     logger,
-    { delayMs: config.syncOptions?.delayMs }
+    { 
+      delayMs: config.syncOptions?.delayMs,
+      dryRun: !!values["dry-run"]
+    }
   );
 
-  await engine.runFullSync();
+  if (values.since) {
+    const sinceDate = new Date(values.since);
+    if (isNaN(sinceDate.getTime())) {
+      logger.error(`Invalid date format for --since: ${values.since}`);
+      process.exit(1);
+    }
+    await engine.runIncrementalSync(sinceDate);
+  } else {
+    await engine.runFullSync();
+  }
 
-  logger.info("Sync completed.");
+  logger.info("Sync operation completed.");
 }
 
 main().catch((err) => {
