@@ -1,12 +1,7 @@
 import { readFile } from "node:fs/promises";
-import { join, dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { parseArgs } from "node:util";
-import {
-  BasicLogger,
-  IdentityMap,
-  SyncEngine,
-  validateConfig,
-} from "@pim-connector/core";
+import { BasicLogger, IdentityMap, SyncEngine, validateConfig } from "@pim-connector/core";
 import { AkeneoAdapter } from "@pim-connector/adapter-akeneo";
 import { VendureAdapter } from "@pim-connector/adapter-vendure";
 
@@ -38,9 +33,7 @@ Options:
     process.exit(0);
   }
 
-  logger.info(
-    `Starting PIM Connector... ${values["dry-run"] ? "(DRY RUN)" : ""}`,
-  );
+  logger.info(`Starting PIM Connector... ${values["dry-run"] ? "(DRY RUN)" : ""}`);
 
   // Load configuration - handle running from root or packages/cli
   let configPath = join(process.cwd(), "connector.config.json");
@@ -55,9 +48,7 @@ Options:
       const configData = await readFile(configPath, "utf-8");
       config = JSON.parse(configData);
     } catch (error) {
-      logger.error(
-        `Could not find connector.config.json in current or parent directories.`,
-      );
+      logger.error(`Could not find connector.config.json in current or parent directories.`);
       process.exit(1);
     }
   }
@@ -86,17 +77,10 @@ Options:
   await source.initialize();
   await target.initialize();
 
-  const engine = new SyncEngine(
-    source,
-    target,
-    config.mapping.attributeMap || {},
-    identityMap,
-    logger,
-    {
-      delayMs: config.syncOptions?.delayMs,
-      dryRun: !!values["dry-run"],
-    },
-  );
+  const engine = new SyncEngine(source, target, identityMap, logger, {
+    delayMs: config.syncOptions?.delayMs,
+    dryRun: !!values["dry-run"],
+  });
 
   if (values.since) {
     const sinceDate = new Date(values.since);
