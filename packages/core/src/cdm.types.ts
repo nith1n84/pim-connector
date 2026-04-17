@@ -2,6 +2,8 @@
  * Canonical Data Model (CDM) for PIM-to-Commerce Integration
  */
 
+export type LocalizedString = Record<string, string>;
+
 export interface Asset {
   id: string;
   url: string;
@@ -18,20 +20,28 @@ export interface Price {
 export interface ProductVariant {
   id: string;
   sku: string;
-  name: string;
-  attributes: Record<string, any>;
+  name: AttributeValue[];
+  attributes: Record<string, AttributeValue[]>;
   prices: Price[];
   assets: Asset[];
+}
+
+export interface AttributeValue {
+  value: string;
+  label: string;
+  type: string;
+  locale: string | null;
+  scope: string | null;
 }
 
 export interface Product {
   id: string;
   sku: string; // Master SKU or Parent SKU
-  name: string;
-  description: string;
+  name: AttributeValue[];
+  description: AttributeValue[];
   enabled: boolean;
   categories: string[];
-  attributes: Record<string, any>;
+  attributes: Record<string, AttributeValue[]>;
   variants: ProductVariant[];
   assets: Asset[];
 }

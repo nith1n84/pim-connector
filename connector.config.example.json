@@ -6,24 +6,37 @@
       "clientId": "your_client_id",
       "secret": "your_secret",
       "username": "your_username",
-      "password": "your_password"
+      "password": "your_password",
+      "locales": ["en_US", "ar_KW"],
+      "scopes": ["ecommerce", "mobile"]
     }
   },
   "target": {
     "adapter": "vendure",
     "config": {
       "url": "http://localhost:3000/admin-api",
-      "token": "your_vendure_token"
+      "token": "your_vendure_token",
+      "email": "superadmin",
+      "password": "superadmin",
+      "localeMap": {
+        "en_US": "en",
+        "ar_AE": "ar"
+      },
+      "channelMap": {
+        "ecommerce": "2",
+        "mobile": "3"
+      }
     }
   },
   "mapping": {
-    "attributeMap": [
-      { "source": "sku", "target": "sku" },
-      { "source": "description", "target": "description" }
-    ]
+    "attributeMap": {
+      "sku": "identifier",
+      "name": "values.name",
+      "description": "values.description"
+    }
   },
   "syncOptions": {
-    "delayMs": 500,
+    "delayMs": 150,
     "retries": 3,
     "retryDelayMs": 1000
   }

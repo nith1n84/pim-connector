@@ -8,8 +8,8 @@ export interface AkeneoConfig {
   secret: string;
   username?: string;
   password?: string;
-  locale?: string;
-  scope?: string;
+  locales: string[];
+  scopes: string[];
 }
 
 export interface AkeneoTokenResponse {
@@ -39,6 +39,7 @@ export interface AkeneoAttributeValue {
   scope: string | null;
   data: any;
   linked_data?: any;
+  attribute_type: string;
 }
 
 export interface AkeneoPagingResponse<T> {

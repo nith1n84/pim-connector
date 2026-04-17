@@ -1,8 +1,11 @@
-import { Product, Asset } from '@pim-connector/core';
-import { AkeneoProduct, AkeneoAttributeValue } from './akeneo.types.js';
+import { Asset, AttributeValue, Product } from "@pim-connector/core";
+import { AkeneoProduct } from "./akeneo.types.js";
 
 export class AkeneoMapper {
-  constructor(private locale: string = 'en_US', private scope: string | null = null) {}
+  constructor(
+    private locales: string[] = ["en_US"],
+    private scopes: string[] | null = null,
+  ) {}
 
   /**
    * Map an Akeneo product response to the Canonical Data Model (CDM) Product.
@@ -11,8 +14,8 @@ export class AkeneoMapper {
     return {
       id: akeneoProduct.identifier,
       sku: akeneoProduct.identifier,
-      name: this.getAttributeValue(akeneoProduct, 'name') || akeneoProduct.identifier,
-      description: this.getAttributeValue(akeneoProduct, 'description') || '',
+      name: this.mapAttribute(akeneoProduct, "name") || akeneoProduct.identifier,
+      description: this.mapAttribute(akeneoProduct, "description") || "",
       enabled: akeneoProduct.enabled,
       categories: akeneoProduct.categories || [],
       attributes: this.mapAllAttributes(akeneoProduct),
@@ -21,20 +24,31 @@ export class AkeneoMapper {
     };
   }
 
-  /**
-   * Helper to extract an attribute value based on locale and scope.
-   */
-  private getAttributeValue(product: AkeneoProduct, attributeCode: string): any {
-    const values = product.values[attributeCode];
-    if (!values || values.length === 0) return null;
+  private mapAttribute(entity: AkeneoProduct, attributeCode: string): AttributeValue[] {
+    const values = entity.values[attributeCode];
+    if (!values || values.length === 0) return [];
 
-    // Filter by locale and scope
-    const match = values.find(
-      (v) => (v.locale === null || v.locale === this.locale) && 
-             (v.scope === null || v.scope === this.scope)
-    );
+    const result: AttributeValue[] = [];
 
-    return match ? match.data : null;
+    for (const v of values) {
+      // locale filter
+      const localeOk = !v.locale || this.locales.includes(v.locale);
+
+      // scope filter
+      const scopeOk = !v.scope || !this.scopes || this.scopes.includes(v.scope);
+
+      if (!localeOk || !scopeOk) continue;
+
+      result.push({
+        value: v.data ? String(v.data) : "",
+        label: v.data ? String(v.data) : "", // adjust if you have a real label source
+        type: typeof v.data,
+        locale: v.locale,
+        scope: v.scope,
+      });
+    }
+
+    return result;
   }
 
   /**
@@ -43,7 +57,7 @@ export class AkeneoMapper {
   private mapAllAttributes(product: AkeneoProduct): Record<string, any> {
     const attributes: Record<string, any> = {};
     for (const [code, values] of Object.entries(product.values)) {
-      attributes[code] = this.getAttributeValue(product, code);
+      attributes[code] = this.mapAttribute(product, code);
     }
     return attributes;
   }

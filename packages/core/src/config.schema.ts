@@ -3,25 +3,25 @@ import { z } from "zod";
 export const SourceAkeneoSchema = z.object({
   adapter: z.literal("akeneo"),
   config: z.object({
-    url: z.string().url(),
+    url: z.url(),
     clientId: z.string(),
     secret: z.string(),
     username: z.string(),
     password: z.string(),
-    scope: z.string().optional(),
-    locale: z.string().optional(),
+    locales: z.array(z.string()),
+    scopes: z.array(z.string()),
   }),
 });
 
 export const TargetVendureSchema = z.object({
   adapter: z.literal("vendure"),
   config: z.object({
-    url: z.string().url(),
-    token: z.string().optional(),
+    url: z.url(),
     email: z.string().optional(),
     password: z.string().optional(),
-    retries: z.number().optional(),
-    retryDelayMs: z.number().optional(),
+
+    localeMap: z.record(z.string(), z.string()),
+    channelMap: z.record(z.string(), z.string()),
   }),
 });
 

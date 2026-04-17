@@ -1,7 +1,5 @@
-import { SourceAdapter, TargetAdapter, Logger } from "./adapter.interface.js";
-import { MappingConfig, transformData } from "./transform.pipeline.js";
+import { Logger, SourceAdapter, TargetAdapter } from "./adapter.interface.js";
 import { IdentityMap } from "./identity-map.js";
-import { Product } from "./cdm.types.js";
 
 export interface SyncOptions {
   delayMs?: number;
@@ -12,10 +10,9 @@ export class SyncEngine {
   constructor(
     private source: SourceAdapter,
     private target: TargetAdapter,
-    private mapping: MappingConfig,
     private identityMap: IdentityMap,
     private logger: Logger,
-    private options: SyncOptions = {}
+    private options: SyncOptions = {},
   ) {}
 
   /**
@@ -75,24 +72,24 @@ export class SyncEngine {
 
     for (const sourceProduct of sourceProducts) {
       try {
-        const transformed: Product = transformData(sourceProduct, this.mapping);
-        
         // 1. Check local identity map
-        const sourceId = sourceProduct.id || transformed.sku;
+        const sourceId = sourceProduct.id || sourceProduct.sku;
         const targetId = this.identityMap.getTargetId(sourceId);
 
         // Log action
         const action = targetId ? "Updating" : "Creating";
-        this.logger.info(`${this.options.dryRun ? '[DRY-RUN] ' : ''}${action} product: ${transformed.sku} (${transformed.name})`);
+        this.logger.info(
+          `${this.options.dryRun ? "[DRY-RUN] " : ""}${action} product: ${sourceProduct.sku} (${sourceProduct.name})`,
+        );
 
         if (!this.options.dryRun) {
-          const newTargetId = await this.target.upsertProduct(transformed, targetId);
-          
+          const newTargetId = await this.target.upsertProduct(sourceProduct, targetId);
+
           // Track in identity map
           this.identityMap.setMapping(sourceId, newTargetId);
           successCount++;
         } else {
-          this.logger.info(`[DRY-RUN] Skipped sync for ${transformed.sku}`);
+          this.logger.info(`[DRY-RUN] Skipped sync for ${sourceProduct.sku}`);
           successCount++;
         }
 
@@ -101,7 +98,7 @@ export class SyncEngine {
           await new Promise((resolve) => setTimeout(resolve, this.options.delayMs));
         }
       } catch (error) {
-        this.logger.error(`Failed to sync product ${sourceProduct.id || 'unknown'}:`, error);
+        this.logger.error(`Failed to sync product ${sourceProduct.id || "unknown"}:`, error);
         errorCount++;
       }
     }
