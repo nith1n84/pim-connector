@@ -1,13 +1,13 @@
 import { GraphQLClient } from "graphql-request";
-import { TargetAdapter, Product, Asset } from "@pim-connector/core";
+import { Asset, Product, TargetAdapter } from "@pim-connector/core";
 import {
-  LOGIN,
-  VendureConfig,
-  GET_PRODUCT_BY_VARIANT_SKU,
   CREATE_PRODUCT,
-  UPDATE_PRODUCT,
   CREATE_PRODUCT_VARIANTS,
+  GET_PRODUCT_BY_VARIANT_SKU,
+  LOGIN,
+  UPDATE_PRODUCT,
   UPDATE_PRODUCT_VARIANTS,
+  VendureConfig,
 } from "./vendure.types.js";
 import { VendureMapper } from "./vendure.mapper.js";
 
@@ -21,7 +21,7 @@ export class VendureAdapter implements TargetAdapter {
     if (config.token) {
       this.setAuthToken(config.token);
     }
-    this.mapper = new VendureMapper();
+    this.mapper = new VendureMapper(config);
   }
 
   private setAuthToken(token: string) {
@@ -61,7 +61,9 @@ export class VendureAdapter implements TargetAdapter {
         return await this.client.request<T>(query, variables);
       } catch (error: any) {
         if (remRetries > 0 && error.message?.includes("database is locked")) {
-          console.warn(`Database locked, retrying in ${currentDelay}ms... (${remRetries} attempts left)`);
+          console.warn(
+            `Database locked, retrying in ${currentDelay}ms... (${remRetries} attempts left)`,
+          );
           await new Promise((resolve) => setTimeout(resolve, currentDelay));
           return attempt(remRetries - 1, currentDelay * 2);
         }
@@ -78,30 +80,22 @@ export class VendureAdapter implements TargetAdapter {
     let productId: string;
     if (existingProduct) {
       console.log(`Updating existing product ${product.sku} (ID: ${existingProduct.id})`);
-      const updateInput = this.mapper.mapToUpdateProductInput(
-        existingProduct.id,
-        product,
-      );
+      const updateInput = this.mapper.mapToUpdateProductInput(existingProduct.id, product);
       await this.requestWithRetry(UPDATE_PRODUCT, { input: updateInput });
       productId = existingProduct.id;
     } else {
       console.log(`Creating new producttt ${product.sku}`);
       const createInput = this.mapper.mapToCreateProductInput(product);
 
-      const resp = await this.requestWithRetry<{ createProduct: { id: string } }>(
-        CREATE_PRODUCT,
-        { input: createInput },
-      );
+      const resp = await this.requestWithRetry<{ createProduct: { id: string } }>(CREATE_PRODUCT, {
+        input: createInput,
+      });
       productId = resp.createProduct.id;
     }
 
     // Handle Variants
     if (product.variants && product.variants.length > 0) {
-      await this.upsertVariants(
-        productId,
-        product.variants,
-        (existingProduct as any)?.variants,
-      );
+      await this.upsertVariants(productId, product.variants, (existingProduct as any)?.variants);
     }
 
     return productId;
@@ -130,9 +124,7 @@ export class VendureAdapter implements TargetAdapter {
     for (const variant of variants) {
       const existing = existingVariants.find((v) => v.sku === variant.sku);
       if (existing) {
-        toUpdate.push(
-          this.mapper.mapToUpdateVariantInput(existing.id, variant),
-        );
+        toUpdate.push(this.mapper.mapToUpdateVariantInput(existing.id, variant));
       } else {
         toCreate.push(this.mapper.mapToCreateVariantInput(productId, variant));
       }
@@ -147,9 +139,7 @@ export class VendureAdapter implements TargetAdapter {
   }
 
   async upsertAsset(asset: Asset): Promise<void> {
-    console.log(
-      `Upserting asset ${asset.url} to Vendure... (Not fully implemented)`,
-    );
+    console.log(`Upserting asset ${asset.url} to Vendure... (Not fully implemented)`);
     // TODO: Implement asset upload via Admin API
   }
 }

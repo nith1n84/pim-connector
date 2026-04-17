@@ -1,4 +1,4 @@
-import { gql } from 'graphql-request';
+import { gql } from "graphql-request";
 
 export interface VendureConfig {
   url: string;
@@ -7,6 +7,8 @@ export interface VendureConfig {
   password?: string;
   retries?: number;
   retryDelayMs?: number;
+  localeMap?: Record<string, string>;
+  channelMap?: Record<string, string>;
 }
 
 export const GET_PRODUCT_BY_VARIANT_SKU = gql`
