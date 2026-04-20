@@ -1,11 +1,17 @@
-import { Asset, AttributeValue, Product } from "@pim-connector/core";
+import { Asset, AttributeDefinition, AttributeValue, Product } from "@pim-connector/core";
 import { AkeneoProduct } from "./akeneo.types.js";
 
 export class AkeneoMapper {
+  private attributeDefinitions: Map<string, AttributeDefinition> = new Map();
+
   constructor(
     private locales: string[] = ["en_US"],
     private scopes: string[] | null = null,
   ) {}
+
+  setAttributeDefinitions(definitions: Map<string, AttributeDefinition>) {
+    this.attributeDefinitions = definitions;
+  }
 
   /**
    * Map an Akeneo product response to the Canonical Data Model (CDM) Product.
@@ -46,31 +52,50 @@ export class AkeneoMapper {
         scope: v.scope,
       };
 
+      // Resolve attribute type from definition if not provided in the value object
+      const type = v.attribute_type || this.attributeDefinitions.get(attributeCode)?.akeneoType;
+
       // todo: revisit the mapping of attribute types to CDM types check all cases
-      switch (v.attribute_type) {
+      switch (type) {
         case "pim_catalog_identifier":
         case "pim_catalog_simpleselect":
         case "pim_catalog_text":
-          attributeValue.value = v.data;
+        case "pim_catalog_textarea":
+          attributeValue.value = v.data ?? "";
           attributeValue.type = "string";
           break;
         case "pim_catalog_boolean":
-          attributeValue.value = v.data;
+          attributeValue.value = String(v.data);
           attributeValue.type = "boolean";
           break;
-
+        case "pim_catalog_number":
+          attributeValue.value = String(v.data);
+          attributeValue.type = "number";
+          break;
+        case "pim_catalog_date":
+          attributeValue.value = v.data ?? "";
+          attributeValue.type = "string";
+          break;
         case "pim_catalog_multiselect":
         case "pim_catalog_asset_collection":
-          attributeValue.value = v.data;
+          attributeValue.value = Array.isArray(v.data) ? JSON.stringify(v.data) : String(v.data);
           attributeValue.type = "array";
           break;
         case "pim_catalog_metric":
           attributeValue.value = v.data ? JSON.stringify(v.data) : "";
-          attributeValue.type = "string";
+          attributeValue.type = "object";
+          break;
+        case "pim_catalog_price_collection":
+          attributeValue.value = v.data ? JSON.stringify(v.data) : "[]";
+          attributeValue.type = "array";
           break;
         default:
-          attributeValue.value = v.data ? v.data.toString() : "";
-          attributeValue.type = typeof v.data;
+          attributeValue.value = v.data
+            ? typeof v.data === "object"
+              ? JSON.stringify(v.data)
+              : String(v.data)
+            : "";
+          attributeValue.type = typeof v.data === "object" ? "object" : typeof v.data;
           break;
       }
       result.push(attributeValue);

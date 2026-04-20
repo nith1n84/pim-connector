@@ -43,6 +43,8 @@ export const MappingSchema = z.object({
       ),
     )
     .optional(),
+  includeAttributes: z.array(z.string()).optional(),
+  excludeAttributes: z.array(z.string()).optional(),
 });
 
 export const SyncOptionsSchema = z.object({

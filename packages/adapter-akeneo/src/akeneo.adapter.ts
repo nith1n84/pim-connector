@@ -1,4 +1,4 @@
-import { Asset, Product, SourceAdapter } from "@pim-connector/core";
+import { Asset, AttributeDefinition, Product, SourceAdapter } from "@pim-connector/core";
 import { AkeneoClient } from "./akeneo.client.js";
 import { AkeneoMapper } from "./akeneo.mapper.js";
 import { AkeneoConfig, AkeneoProduct } from "./akeneo.types.js";
@@ -7,6 +7,7 @@ export class AkeneoAdapter implements SourceAdapter {
   readonly name = "akeneo";
   private client: AkeneoClient;
   private mapper: AkeneoMapper;
+  private attributeDefinitions: Map<string, AttributeDefinition> = new Map();
 
   constructor(config: AkeneoConfig) {
     this.client = new AkeneoClient(config);
@@ -14,8 +15,40 @@ export class AkeneoAdapter implements SourceAdapter {
   }
 
   async initialize(): Promise<void> {
-    // Client handles initialization/auth lazily, but we can verify it here
-    console.log("Akeneo Adapter initialized");
+    console.log("Initializing Akeneo Adapter...");
+    const rawDefinitions = await this.client.getAttributeDefinitions();
+
+    for (const raw of rawDefinitions) {
+      this.attributeDefinitions.set(raw.code, {
+        code: raw.code,
+        akeneoType: raw.type,
+        cdmType: this.mapAkeneoTypeToCdmType(raw.type),
+        localisable: !!raw.localizable,
+        scopable: !!raw.scopable,
+      });
+    }
+
+    this.mapper.setAttributeDefinitions(this.attributeDefinitions);
+    console.log(
+      `Akeneo Adapter initialized with ${this.attributeDefinitions.size} attribute definitions`,
+    );
+  }
+
+  private mapAkeneoTypeToCdmType(akeneoType: string): AttributeDefinition["cdmType"] {
+    switch (akeneoType) {
+      case "pim_catalog_boolean":
+        return "boolean";
+      case "pim_catalog_number":
+        return "number";
+      case "pim_catalog_multiselect":
+      case "pim_catalog_asset_collection":
+      case "pim_catalog_price_collection":
+        return "array";
+      case "pim_catalog_metric":
+        return "object";
+      default:
+        return "string";
+    }
   }
 
   async getProducts(): Promise<Product[]> {

@@ -33,6 +33,14 @@ export interface AttributeValue {
   scope: string | null;
 }
 
+export interface AttributeDefinition {
+  code: string;
+  akeneoType: string;
+  cdmType: "string" | "boolean" | "number" | "array" | "object";
+  localisable: boolean;
+  scopable: boolean;
+}
+
 export interface Product {
   id: string;
   sku: string; // Master SKU or Parent SKU

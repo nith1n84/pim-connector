@@ -67,6 +67,8 @@ Options:
     ...config.target.config,
     retries: config.syncOptions?.retries,
     retryDelayMs: config.syncOptions?.retryDelayMs,
+    includeAttributes: config.mapping.includeAttributes,
+    excludeAttributes: config.mapping.excludeAttributes,
   });
 
   // Initialize identity map with persistence

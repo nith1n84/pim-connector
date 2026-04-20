@@ -1,5 +1,5 @@
 import axios, { AxiosInstance, AxiosRequestConfig } from "axios";
-import { AkeneoConfig, AkeneoTokenResponse, AkeneoPagingResponse } from "./akeneo.types.js";
+import { AkeneoConfig, AkeneoPagingResponse, AkeneoTokenResponse } from "./akeneo.types.js";
 
 export class AkeneoClient {
   private axiosInstance: AxiosInstance;
@@ -111,5 +111,16 @@ export class AkeneoClient {
       // After first page, Akeneo's next link includes full path, so we don't need base URL or params again
       currentParams = undefined;
     }
+  }
+  /**
+   * Fetch all attribute definitions
+   */
+  async getAttributeDefinitions(): Promise<any[]> {
+    const definitions: any[] = [];
+    const iterator = this.paginate<any>("/api/rest/v1/attributes");
+    for await (const items of iterator) {
+      definitions.push(...items);
+    }
+    return definitions;
   }
 }
