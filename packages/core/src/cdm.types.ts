@@ -28,7 +28,6 @@ export interface ProductVariant {
 
 export interface AttributeValue {
   value: string;
-  label: string;
   type: string;
   locale: string | null;
   scope: string | null;

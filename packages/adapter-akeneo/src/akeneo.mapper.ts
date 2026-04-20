@@ -39,13 +39,41 @@ export class AkeneoMapper {
 
       if (!localeOk || !scopeOk) continue;
 
-      result.push({
-        value: v.data ? String(v.data) : "",
-        label: v.data ? String(v.data) : "", // adjust if you have a real label source
-        type: typeof v.data,
+      let attributeValue: AttributeValue = {
+        value: "",
+        type: "",
         locale: v.locale,
         scope: v.scope,
-      });
+      };
+
+      // todo: revisit the mapping of attribute types to CDM types check all cases
+      switch (v.attribute_type) {
+        case "pim_catalog_identifier":
+        case "pim_catalog_simpleselect":
+        case "pim_catalog_text":
+          attributeValue.value = v.data;
+          attributeValue.type = "string";
+          break;
+        case "pim_catalog_boolean":
+          attributeValue.value = v.data;
+          attributeValue.type = "boolean";
+          break;
+
+        case "pim_catalog_multiselect":
+        case "pim_catalog_asset_collection":
+          attributeValue.value = v.data;
+          attributeValue.type = "array";
+          break;
+        case "pim_catalog_metric":
+          attributeValue.value = v.data ? JSON.stringify(v.data) : "";
+          attributeValue.type = "string";
+          break;
+        default:
+          attributeValue.value = v.data ? v.data.toString() : "";
+          attributeValue.type = typeof v.data;
+          break;
+      }
+      result.push(attributeValue);
     }
 
     return result;
