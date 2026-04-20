@@ -1,4 +1,4 @@
 schema: http://localhost:3000/admin-api
 documents:
-  - 'src/**/*.ts'
-  - 'src/**/*.graphql'
+  - "src/**/*.ts"
+  - "src/**/*.graphql"

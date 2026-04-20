@@ -3,7 +3,7 @@ export type TransformFunc = (value: any) => any;
 export interface FieldMapping {
   path: string;
   defaultValue?: any;
-  transform?: TransformFunc | 'string' | 'number' | 'boolean';
+  transform?: TransformFunc | "string" | "number" | "boolean";
 }
 
 export interface MappingConfig {
@@ -18,8 +18,8 @@ export class TransformationEngine {
     const result: any = {};
 
     for (const [targetKey, config] of Object.entries(mapping)) {
-      const fieldConfig: FieldMapping = typeof config === 'string' ? { path: config } : config;
-      
+      const fieldConfig: FieldMapping = typeof config === "string" ? { path: config } : config;
+
       let value = this.getNestedValue(source, fieldConfig.path);
 
       // Apply default value if missing
@@ -43,27 +43,27 @@ export class TransformationEngine {
    */
   private getNestedValue(obj: any, path: string): any {
     if (!obj || !path) return undefined;
-    
-    return path.split('.').reduce((acc, part) => {
-      return acc && typeof acc === 'object' ? acc[part] : undefined;
+
+    return path.split(".").reduce((acc, part) => {
+      return acc && typeof acc === "object" ? acc[part] : undefined;
     }, obj);
   }
 
   /**
    * Applies the specified transformation to a value.
    */
-  private applyTransform(value: any, transform: FieldMapping['transform']): any {
-    if (typeof transform === 'function') {
+  private applyTransform(value: any, transform: FieldMapping["transform"]): any {
+    if (typeof transform === "function") {
       return transform(value);
     }
 
     switch (transform) {
-      case 'string':
+      case "string":
         return String(value);
-      case 'number':
+      case "number":
         const num = Number(value);
         return isNaN(num) ? undefined : num;
-      case 'boolean':
+      case "boolean":
         return Boolean(value);
       default:
         return value;
