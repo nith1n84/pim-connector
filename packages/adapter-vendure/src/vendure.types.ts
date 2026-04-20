@@ -9,6 +9,8 @@ export interface VendureConfig {
   retryDelayMs?: number;
   localeMap?: Record<string, string>;
   channelMap?: Record<string, string>;
+  includeAttributes?: string[];
+  excludeAttributes?: string[];
 }
 
 export const GET_PRODUCT_BY_VARIANT_SKU = gql`
@@ -76,6 +78,35 @@ export const LOGIN = gql`
       ... on InvalidCredentialsError {
         message
       }
+    }
+  }
+`;
+
+export const UPSERT_PRODUCT_ATTRIBUTES = gql`
+  mutation UpsertProductAttributes($productId: ID!, $input: [UpsertProductAttributeInput!]!) {
+    upsertProductAttributes(productId: $productId, input: $input) {
+      id
+      code
+      value
+    }
+  }
+`;
+
+export const DELETE_PRODUCT_ATTRIBUTES = gql`
+  mutation DeleteProductAttributesByProduct($productId: ID!) {
+    deleteProductAttributesByProduct(productId: $productId)
+  }
+`;
+
+export const GET_PRODUCT_ATTRIBUTES = gql`
+  query GetProductAttributes($productId: ID!) {
+    productAttributes(productId: $productId) {
+      id
+      code
+      value
+      type
+      locale
+      scope
     }
   }
 `;

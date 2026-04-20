@@ -7,6 +7,7 @@ import {
   LOGIN,
   UPDATE_PRODUCT,
   UPDATE_PRODUCT_VARIANTS,
+  UPSERT_PRODUCT_ATTRIBUTES,
   VendureConfig,
 } from "./vendure.types.js";
 import { VendureMapper } from "./vendure.mapper.js";
@@ -96,6 +97,26 @@ export class VendureAdapter implements TargetAdapter {
     // Handle Variants
     if (product.variants && product.variants.length > 0) {
       await this.upsertVariants(productId, product.variants, (existingProduct as any)?.variants);
+    }
+
+    // Handle Custom Attributes
+    if (product.attributes && Object.keys(product.attributes).length > 0) {
+      console.log(`Syncing custom attributes for product ${product.sku}`);
+      const attributeInputs = this.mapper.mapToProductAttributeInputs(
+        productId,
+        product.attributes,
+        {
+          includeAttributes: this.config.includeAttributes,
+          excludeAttributes: this.config.excludeAttributes,
+        },
+      );
+
+      if (attributeInputs.length > 0) {
+        await this.requestWithRetry(UPSERT_PRODUCT_ATTRIBUTES, {
+          productId,
+          input: attributeInputs,
+        });
+      }
     }
 
     return productId;

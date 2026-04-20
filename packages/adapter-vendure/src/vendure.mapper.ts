@@ -152,6 +152,53 @@ export class VendureMapper {
     };
   }
 
+  /**
+   * Map CDM attributes to Vendure ProductAttribute inputs
+   */
+  mapToProductAttributeInputs(
+    productId: string,
+    attributes: Record<string, AttributeValue[]>,
+    options?: {
+      includeAttributes?: string[];
+      excludeAttributes?: string[];
+    },
+  ) {
+    const inputs: any[] = [];
+
+    for (const [code, values] of Object.entries(attributes)) {
+      // Apply filters
+      if (options?.includeAttributes && !options.includeAttributes.includes(code)) continue;
+      if (options?.excludeAttributes && options.excludeAttributes.includes(code)) continue;
+
+      for (const attr of values) {
+        // Resolve locale
+        let targetLocale: string | null = null;
+        if (attr.locale) {
+          targetLocale = this.config.localeMap?.[attr.locale] || attr.locale.split("_")[0];
+          // If we have a locale map and this locale isn't in it, we might want to skip or fallback
+          // For now, we'll use the mapping or the short language code
+        }
+
+        // Resolve scope (channel)
+        let targetScope: string | null = null;
+        if (attr.scope) {
+          targetScope = this.config.channelMap?.[attr.scope] || attr.scope;
+        }
+
+        inputs.push({
+          productId,
+          code,
+          value: attr.value,
+          type: attr.type,
+          locale: targetLocale,
+          scope: targetScope,
+        });
+      }
+    }
+
+    return inputs;
+  }
+
   private sluggify(text: string): string {
     if (!text) return "product-" + Math.random().toString(36).substring(7);
     return text
