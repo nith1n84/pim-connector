@@ -111,27 +111,48 @@ export class VendureMapper {
   /**
    * Map CDM Variant to Vendure CreateProductVariantInput
    */
-  mapToCreateVariantInput(productId: string, variant: ProductVariant) {
-    return {
+  mapToCreateVariantInput(
+    productId: string,
+    variant: ProductVariant,
+    optionIdMap: Map<string, string> = new Map(),
+  ) {
+    const nameTranslations = this.mapTranslations(variant.name, variant.sku || "Unknown Product");
+
+    const translations = nameTranslations.map((nameTrans, index) => {
+      return {
+        languageCode: nameTrans.languageCode,
+        name: nameTrans.name,
+      };
+    });
+
+    const input: any = {
       productId,
       sku: variant.sku,
       price: variant.prices[0]?.amount || 0,
-      translations: [
-        {
-          languageCode: "en",
-          name: variant.name,
-        },
-      ],
+      translations: translations,
     };
+
+    // Add option values if present, mapping Akeneo option codes to Vendure option IDs
+    if (variant.optionValues && variant.optionValues.length > 0) {
+      input.optionIds = variant.optionValues.map(
+        (ov) => optionIdMap.get(ov.optionId) || ov.optionId,
+      );
+    }
+
+    return input;
   }
 
   /**
    * Map CDM Variant to Vendure UpdateProductVariantInput
    */
-  mapToUpdateVariantInput(variantId: string, variant: ProductVariant) {
+  mapToUpdateVariantInput(
+    variantId: string,
+    variant: ProductVariant,
+    optionIdMap: Map<string, string> = new Map(),
+  ) {
     const nameTranslations = this.mapTranslations(variant.name, variant.sku || "Unknown Variant");
 
-    return {
+    const input: any = {
       id: variantId,
       sku: variant.sku,
       price: variant.prices[0]?.amount || 0,
@@ -140,6 +161,15 @@ export class VendureMapper {
         name: trans.name,
       })),
     };
+
+    // Add option values if present, mapping Akeneo option codes to Vendure option IDs
+    if (variant.optionValues && variant.optionValues.length > 0) {
+      input.optionIds = variant.optionValues.map(
+        (ov) => optionIdMap.get(ov.optionId) || ov.optionId,
+      );
+    }
+
+    return input;
   }
 
   /**

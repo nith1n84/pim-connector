@@ -4,6 +4,20 @@
 
 export type LocalizedString = Record<string, string>;
 
+export interface OptionGroup {
+  id: string;
+  code: string;
+  name: LocalizedString;
+  values: Option[];
+}
+
+export interface Option {
+  id: string;
+  code: string;
+  name: LocalizedString;
+  optionGroupId: string;
+}
+
 export interface Asset {
   id: string;
   url: string;
@@ -24,6 +38,10 @@ export interface ProductVariant {
   attributes: Record<string, AttributeValue[]>;
   prices: Price[];
   assets: Asset[];
+  optionValues?: {
+    optionGroupId: string;
+    optionId: string;
+  }[];
 }
 
 export interface AttributeValue {
@@ -43,7 +61,7 @@ export interface AttributeDefinition {
 
 export interface Product {
   id: string;
-  sku: string; // Master SKU or Parent SKU
+  sku?: string; // Master SKU or Parent SKU
   name: AttributeValue[];
   description: AttributeValue[];
   enabled: boolean;
@@ -51,4 +69,5 @@ export interface Product {
   attributes: Record<string, AttributeValue[]>;
   variants: ProductVariant[];
   assets: Asset[];
+  optionGroups?: OptionGroup[];
 }

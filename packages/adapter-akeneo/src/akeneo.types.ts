@@ -53,3 +53,27 @@ export interface AkeneoPagingResponse<T> {
     items: T[];
   };
 }
+
+export interface AkeneoProductModel {
+  code: string;
+  family: string;
+  family_variant: string;
+  parent?: string;
+  categories?: string[];
+  values: Record<string, AkeneoAttributeValue[]>;
+  created?: string;
+  updated?: string;
+  associations?: Record<string, any>;
+  quantified_associations?: Record<string, any>;
+}
+
+export interface AkeneoFamilyVariant {
+  code: string;
+  labels: Record<string, string>;
+  variant_attribute_sets: {
+    level: number;
+    axes: string[];
+    attributes: string[];
+  }[];
+  common_attributes: string[];
+}

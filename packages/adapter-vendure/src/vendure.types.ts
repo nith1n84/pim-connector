@@ -110,3 +110,38 @@ export const GET_PRODUCT_ATTRIBUTES = gql`
     }
   }
 `;
+
+export const CREATE_PRODUCT_OPTION_GROUP = gql`
+  mutation CreateProductOptionGroup($input: CreateProductOptionGroupInput!) {
+    createProductOptionGroup(input: $input) {
+      id
+      code
+      name
+    }
+  }
+`;
+
+export const CREATE_PRODUCT_OPTION = gql`
+  mutation CreateProductOption($input: CreateProductOptionInput!) {
+    createProductOption(input: $input) {
+      id
+      code
+      name
+      groupId
+    }
+  }
+`;
+
+export const ADD_OPTION_GROUP_TO_PRODUCT = gql`
+  mutation AddOptionGroupToProduct($productId: ID!, $optionGroupId: ID!) {
+    addOptionGroupToProduct(productId: $productId, optionGroupId: $optionGroupId) {
+      id
+      name
+      optionGroups {
+        id
+        code
+        name
+      }
+    }
+  }
+`;

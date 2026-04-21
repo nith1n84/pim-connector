@@ -1,15 +1,32 @@
-import { Asset, AttributeDefinition, AttributeValue, Product } from "@pim-connector/core";
-import { AkeneoProduct } from "./akeneo.types.js";
+import {
+  Asset,
+  AttributeDefinition,
+  AttributeValue,
+  OptionGroup,
+  Product,
+  ProductVariant,
+} from "@pim-connector/core";
+import {
+  AkeneoAttributeValue,
+  AkeneoFamilyVariant,
+  AkeneoProduct,
+  AkeneoProductModel,
+} from "./akeneo.types.js";
 
 export class AkeneoMapper {
   private attributeDefinitions: Map<string, AttributeDefinition> = new Map();
   private familyMappings: Map<string, { labelAttribute: string; imageAttribute: string | null }> =
     new Map();
+  private optionGroups: OptionGroup[] = [];
 
   constructor(
     private locales: string[] = ["en_US"],
     private scopes: string[] | null = null,
   ) {}
+
+  setOptionGroups(optionGroups: OptionGroup[]) {
+    this.optionGroups = optionGroups;
+  }
 
   setAttributeDefinitions(definitions: Map<string, AttributeDefinition>) {
     this.attributeDefinitions = definitions;
@@ -19,6 +36,53 @@ export class AkeneoMapper {
     mappings: Map<string, { labelAttribute: string; imageAttribute: string | null }>,
   ) {
     this.familyMappings = mappings;
+  }
+
+  mapVariantsToProduct(
+    model: AkeneoProductModel,
+    familyVariant: AkeneoFamilyVariant,
+    variants: AkeneoProduct[],
+    familyMapping?: { labelAttribute: string; imageAttribute: string | null },
+  ): Product | null {
+    const labelAttribute = familyMapping?.labelAttribute || "name";
+    const imageAttribute = familyMapping?.imageAttribute || null;
+
+    // Get relevant option groups for variant axes
+    const relevantOptionGroups = this.getRelevantOptionGroups(familyVariant);
+
+    const productVariants: ProductVariant[] = [];
+
+    variants.forEach((variant) => {
+      const optionValues = this.extractVariantOptionValues(variant, familyVariant);
+
+      productVariants.push({
+        id: variant.identifier,
+        sku: variant.identifier,
+        name: this.mapAttribute(variant.values, labelAttribute) || variants[0].identifier,
+        prices: [
+          {
+            amount: 0,
+            currency: "AED",
+          },
+        ],
+        attributes: this.mapAllAttributes(variant.values),
+        assets: this.mapAssets(variant),
+        optionValues,
+      });
+    });
+
+    return {
+      id: model.code,
+      sku: variants[0].identifier,
+      name: this.mapAttribute(variants[0].values, labelAttribute) || variants[0].identifier,
+      description: this.mapAttribute(model.values, "description") || "",
+      enabled: variants[0].enabled,
+      categories: model.categories || [],
+      attributes: this.mapAllAttributes(model.values),
+      variants: productVariants,
+      assets: this.mapAssets(model),
+      optionGroups: relevantOptionGroups,
+    };
   }
 
   /**
@@ -34,18 +98,21 @@ export class AkeneoMapper {
     return {
       id: akeneoProduct.identifier,
       sku: akeneoProduct.identifier,
-      name: this.mapAttribute(akeneoProduct, labelAttribute) || akeneoProduct.identifier,
-      description: this.mapAttribute(akeneoProduct, "description") || "",
+      name: this.mapAttribute(akeneoProduct.values, labelAttribute) || akeneoProduct.identifier,
+      description: this.mapAttribute(akeneoProduct.values, "description") || "",
       enabled: akeneoProduct.enabled,
       categories: akeneoProduct.categories || [],
-      attributes: this.mapAllAttributes(akeneoProduct),
+      attributes: this.mapAllAttributes(akeneoProduct.values),
       variants: [], // Simple products only for now
       assets: this.mapAssets(akeneoProduct),
     };
   }
 
-  private mapAttribute(entity: AkeneoProduct, attributeCode: string): AttributeValue[] {
-    const values = entity.values[attributeCode];
+  private mapAttribute(
+    attributes: Record<string, AkeneoAttributeValue[]>,
+    attributeCode: string,
+  ): AttributeValue[] {
+    const values = attributes[attributeCode];
     if (!values || values.length === 0) return [];
 
     const result: AttributeValue[] = [];
@@ -121,18 +188,100 @@ export class AkeneoMapper {
   /**
    * Map all attribute values to a flat record.
    */
-  private mapAllAttributes(product: AkeneoProduct): Record<string, any> {
-    const attributes: Record<string, any> = {};
-    for (const [code, values] of Object.entries(product.values)) {
-      attributes[code] = this.mapAttribute(product, code);
+  private mapAllAttributes(
+    attributes: Record<string, AkeneoAttributeValue[]>,
+  ): Record<string, any> {
+    const mappedAttributes: Record<string, any> = {};
+    for (const [code, values] of Object.entries(attributes)) {
+      mappedAttributes[code] = this.mapAttribute(attributes, code);
     }
-    return attributes;
+    return mappedAttributes;
+  }
+
+  /**
+   * Get relevant option groups for variant axes.
+   */
+  private getRelevantOptionGroups(familyVariant: AkeneoFamilyVariant): OptionGroup[] {
+    const relevantGroups: OptionGroup[] = [];
+
+    // Get all axes from all variant attribute sets
+    const allAxes = new Set<string>();
+    for (const variantSet of familyVariant.variant_attribute_sets) {
+      for (const axis of variantSet.axes) {
+        allAxes.add(axis);
+      }
+    }
+
+    // Find option groups that match these axes
+    for (const axis of allAxes) {
+      const optionGroup = this.optionGroups.find((og) => og.code === axis);
+      if (optionGroup) {
+        relevantGroups.push(optionGroup);
+      }
+    }
+
+    return relevantGroups;
+  }
+
+  /**
+   * Extract option values from variant based on family variant axes.
+   */
+  private extractVariantOptionValues(
+    variant: AkeneoProduct,
+    familyVariant: AkeneoFamilyVariant,
+  ): { optionGroupId: string; optionId: string }[] {
+    const optionValues: { optionGroupId: string; optionId: string }[] = [];
+
+    // Get all axes from all variant attribute sets
+    const allAxes = new Set<string>();
+    for (const variantSet of familyVariant.variant_attribute_sets) {
+      for (const axis of variantSet.axes) {
+        allAxes.add(axis);
+      }
+    }
+
+    // Extract values for each axis, but only if the variant has a value for that axis
+    for (const axis of allAxes) {
+      const attributeValues = variant.values[axis];
+      if (attributeValues && attributeValues.length > 0) {
+        // Get the first value that matches our locale/scope criteria
+        const value = this.findBestAttributeValue(attributeValues);
+        if (value && value.data) {
+          optionValues.push({
+            optionGroupId: axis,
+            optionId: String(value.data),
+          });
+        }
+      }
+    }
+
+    return optionValues;
+  }
+
+  /**
+   * Find the best attribute value based on locale and scope preferences.
+   */
+  private findBestAttributeValue(values: AkeneoAttributeValue[]): AkeneoAttributeValue | null {
+    for (const v of values) {
+      // locale filter
+      const localeOk = !v.locale || this.locales.includes(v.locale);
+
+      // scope filter
+      const scopeOk = !v.scope || !this.scopes || this.scopes.includes(v.scope);
+
+      if (localeOk && scopeOk) {
+        return v;
+      }
+    }
+
+    // Fallback to first value if none match
+    return values.length > 0 ? values[0] : null;
   }
 
   /**
    * Map assets if available (placeholder for now).
    */
-  private mapAssets(product: AkeneoProduct): Asset[] {
+  private mapAssets(product: AkeneoProduct | AkeneoProductModel): Asset[] {
     // In Akeneo, assets are often stored in 'media_file' or 'image' attribute types
     // Or via the Asset Manager (which has a different API endpoint)
     // For now, we'll try to find common image attributes.
