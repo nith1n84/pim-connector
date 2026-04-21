@@ -8,6 +8,8 @@ export class AkeneoAdapter implements SourceAdapter {
   private client: AkeneoClient;
   private mapper: AkeneoMapper;
   private attributeDefinitions: Map<string, AttributeDefinition> = new Map();
+  private familyMappings: Map<string, { labelAttribute: string; imageAttribute: string | null }> =
+    new Map();
 
   constructor(config: AkeneoConfig) {
     this.client = new AkeneoClient(config);
@@ -28,9 +30,20 @@ export class AkeneoAdapter implements SourceAdapter {
       });
     }
 
+    // Fetch and cache family mappings
+    const families = await this.client.getFamilies();
+    for (const family of families) {
+      this.familyMappings.set(family.code, {
+        labelAttribute: family.attribute_as_label || "name",
+        imageAttribute: family.attribute_as_image || null,
+      });
+    }
+
     this.mapper.setAttributeDefinitions(this.attributeDefinitions);
+    this.mapper.setFamilyMappings(this.familyMappings);
+
     console.log(
-      `Akeneo Adapter initialized with ${this.attributeDefinitions.size} attribute definitions`,
+      `Akeneo Adapter initialized with ${this.attributeDefinitions.size} attribute definitions and ${this.familyMappings.size} family mappings`,
     );
   }
 
@@ -53,18 +66,52 @@ export class AkeneoAdapter implements SourceAdapter {
 
   async getProducts(): Promise<Product[]> {
     const products: Product[] = [];
-    const iterator = this.client.paginate<AkeneoProduct>("/api/rest/v1/products");
 
-    for await (const items of iterator) {
-      for (const item of items) {
-        if (item.parent) {
-          // todo: handle variant products later here !!
-          continue;
+    if (this.familyMappings.size === 0) {
+      console.warn("No family mappings available. Please ensure families are properly loaded.");
+      return products;
+    }
+
+    // Process each family separately
+    for (const [familyCode, familyMapping] of this.familyMappings) {
+      try {
+        console.log(`Fetching products for family: ${familyCode}`);
+
+        const searchFilter = {
+          family: [
+            {
+              operator: "IN",
+              value: [familyCode],
+            },
+          ],
+        };
+
+        const iterator = this.client.paginate<AkeneoProduct>("/api/rest/v1/products", {
+          search: JSON.stringify(searchFilter),
+        });
+
+        let familyProductCount = 0;
+        for await (const items of iterator) {
+          for (const item of items) {
+            if (item.parent) {
+              // todo: handle variant products later here !!
+              continue;
+            }
+
+            products.push(this.mapper.mapToProduct(item, familyMapping));
+            familyProductCount++;
+          }
         }
 
-        products.push(this.mapper.mapToProduct(item));
+        console.log(`Fetched ${familyProductCount} products from family: ${familyCode}`);
+      } catch (error) {
+        console.error(`Failed to fetch products for family ${familyCode}:`, error);
+        // Continue with other families even if one fails
+        continue;
       }
     }
+
+    console.log(`Fetched total of ${products.length} products from all families`);
     return products;
   }
 
@@ -74,7 +121,13 @@ export class AkeneoAdapter implements SourceAdapter {
         url: `/api/rest/v1/products/${id}`,
         method: "GET",
       });
-      return this.mapper.mapToProduct(akeneoProduct);
+
+      // Get family mapping for this product
+      const familyMapping = akeneoProduct.family
+        ? this.familyMappings.get(akeneoProduct.family)
+        : undefined;
+
+      return this.mapper.mapToProduct(akeneoProduct, familyMapping);
     } catch (error) {
       return null;
     }
@@ -83,23 +136,56 @@ export class AkeneoAdapter implements SourceAdapter {
   async getUpdatedProducts(since: Date): Promise<Product[]> {
     const products: Product[] = [];
 
-    const searchFilter = {
-      updated: [
-        {
-          operator: ">",
-          value: this.formatAkeneoDate(since),
-        },
-      ],
-    };
-
-    const iterator = this.client.paginate<AkeneoProduct>("/api/rest/v1/products", {
-      search: JSON.stringify(searchFilter),
-    });
-
-    for await (const items of iterator) {
-      products.push(...items.map((item) => this.mapper.mapToProduct(item)));
+    if (this.familyMappings.size === 0) {
+      console.warn("No family mappings available. Please ensure families are properly loaded.");
+      return products;
     }
 
+    // Process each family separately for updated products
+    for (const [familyCode, familyMapping] of this.familyMappings) {
+      try {
+        const searchFilter = {
+          family: [
+            {
+              operator: "IN",
+              value: [familyCode],
+            },
+          ],
+          updated: [
+            {
+              operator: ">",
+              value: this.formatAkeneoDate(since),
+            },
+          ],
+        };
+
+        const iterator = this.client.paginate<AkeneoProduct>("/api/rest/v1/products", {
+          search: JSON.stringify(searchFilter),
+        });
+
+        let familyUpdatedCount = 0;
+        for await (const items of iterator) {
+          for (const item of items) {
+            if (item.parent) {
+              // todo: handle variant products later here !!
+              continue;
+            }
+            products.push(this.mapper.mapToProduct(item, familyMapping));
+            familyUpdatedCount++;
+          }
+        }
+
+        if (familyUpdatedCount > 0) {
+          console.log(`Found ${familyUpdatedCount} updated products in family: ${familyCode}`);
+        }
+      } catch (error) {
+        console.error(`Failed to fetch updated products for family ${familyCode}:`, error);
+        // Continue with other families even if one fails
+        continue;
+      }
+    }
+
+    console.log(`Found total of ${products.length} updated products`);
     return products;
   }
 

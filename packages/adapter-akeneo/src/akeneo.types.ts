@@ -40,6 +40,7 @@ export interface AkeneoAttributeValue {
   data: any;
   linked_data?: any;
   attribute_type: string;
+  reference_data_name?: string;
 }
 
 export interface AkeneoPagingResponse<T> {

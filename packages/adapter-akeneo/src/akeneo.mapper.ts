@@ -3,6 +3,8 @@ import { AkeneoProduct } from "./akeneo.types.js";
 
 export class AkeneoMapper {
   private attributeDefinitions: Map<string, AttributeDefinition> = new Map();
+  private familyMappings: Map<string, { labelAttribute: string; imageAttribute: string | null }> =
+    new Map();
 
   constructor(
     private locales: string[] = ["en_US"],
@@ -13,14 +15,26 @@ export class AkeneoMapper {
     this.attributeDefinitions = definitions;
   }
 
+  setFamilyMappings(
+    mappings: Map<string, { labelAttribute: string; imageAttribute: string | null }>,
+  ) {
+    this.familyMappings = mappings;
+  }
+
   /**
    * Map an Akeneo product response to the Canonical Data Model (CDM) Product.
    */
-  mapToProduct(akeneoProduct: AkeneoProduct): Product {
+  mapToProduct(
+    akeneoProduct: AkeneoProduct,
+    familyMapping?: { labelAttribute: string; imageAttribute: string | null },
+  ): Product {
+    const labelAttribute = familyMapping?.labelAttribute || "name";
+    const imageAttribute = familyMapping?.imageAttribute || null;
+
     return {
       id: akeneoProduct.identifier,
       sku: akeneoProduct.identifier,
-      name: this.mapAttribute(akeneoProduct, "name") || akeneoProduct.identifier,
+      name: this.mapAttribute(akeneoProduct, labelAttribute) || akeneoProduct.identifier,
       description: this.mapAttribute(akeneoProduct, "description") || "",
       enabled: akeneoProduct.enabled,
       categories: akeneoProduct.categories || [],

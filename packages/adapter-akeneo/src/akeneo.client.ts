@@ -123,4 +123,16 @@ export class AkeneoClient {
     }
     return definitions;
   }
+
+  /**
+   * Fetch all families with their label and image attributes
+   */
+  async getFamilies(): Promise<any[]> {
+    const families: any[] = [];
+    const iterator = this.paginate<any>("/api/rest/v1/families");
+    for await (const items of iterator) {
+      families.push(...items);
+    }
+    return families;
+  }
 }
