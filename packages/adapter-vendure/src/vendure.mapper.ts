@@ -128,7 +128,8 @@ export class VendureMapper {
     const input: any = {
       productId,
       sku: variant.sku,
-      price: variant.prices[0]?.amount || 0,
+      price: 0,
+      stockOnHand: 0,
       translations: translations,
     };
 

@@ -121,6 +121,18 @@ export const CREATE_PRODUCT_OPTION_GROUP = gql`
   }
 `;
 
+export const GET_PRODUCT_OPTION_GROUPS = gql`
+  query getProductOptionGroups($options: ProductOptionGroupListOptions) {
+    productOptionGroups(options: $options) {
+      items {
+        id
+        code
+        name
+      }
+    }
+  }
+`;
+
 export const CREATE_PRODUCT_OPTION = gql`
   mutation CreateProductOption($input: CreateProductOptionInput!) {
     createProductOption(input: $input) {

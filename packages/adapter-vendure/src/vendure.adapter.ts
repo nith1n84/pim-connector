@@ -7,6 +7,7 @@ import {
   CREATE_PRODUCT_OPTION_GROUP,
   CREATE_PRODUCT_VARIANTS,
   GET_PRODUCT_BY_VARIANT_SKU,
+  GET_PRODUCT_OPTION_GROUPS,
   LOGIN,
   UPDATE_PRODUCT,
   UPDATE_PRODUCT_VARIANTS,
@@ -186,6 +187,28 @@ export class VendureAdapter implements TargetAdapter {
     // TODO: Implement asset upload via Admin API
   }
 
+  private async findOptionGroupByCode(code: string): Promise<string | null> {
+    try {
+      const resp = await this.requestWithRetry<{
+        productOptionGroups: { items: Array<{ id: string; code: string }> };
+      }>(GET_PRODUCT_OPTION_GROUPS, {
+        options: {
+          filter: {
+            code: { eq: code },
+          },
+        },
+      });
+
+      if (resp.productOptionGroups.items.length > 0) {
+        return resp.productOptionGroups.items[0].id;
+      }
+      return null;
+    } catch (error) {
+      console.error(`Error finding option group by code ${code}:`, error);
+      return null;
+    }
+  }
+
   private async createOptionGroup(optionGroup: any): Promise<string | null> {
     try {
       const translations = Object.entries(optionGroup.name || { en_US: optionGroup.code }).map(
@@ -256,24 +279,40 @@ export class VendureAdapter implements TargetAdapter {
       let groupId: string | undefined = VendureAdapter.globalOptionGroupMap.get(optionGroup.code);
 
       if (!groupId) {
-        // Create new option group if it doesn't exist
-        const createdGroupId = await this.createOptionGroup(optionGroup);
-        if (createdGroupId) {
-          groupId = createdGroupId;
-          VendureAdapter.globalOptionGroupMap.set(optionGroup.code, groupId);
-          console.log(`Created option group: ${optionGroup.code} (ID: ${groupId})`);
+        // Check if option group exists in Vendure
+        const existingGroupId = await this.findOptionGroupByCode(optionGroup.code);
 
-          // Create options for this group and track the mapping
-          if (optionGroup.values && optionGroup.values.length > 0) {
-            await this.createOptionsForGroup(
-              groupId,
-              optionGroup.values,
-              VendureAdapter.globalOptionIdMap,
-            );
+        if (existingGroupId) {
+          groupId = existingGroupId;
+          // Found existing option group in Vendure, add to global map
+          VendureAdapter.globalOptionGroupMap.set(optionGroup.code, groupId);
+          console.log(
+            `Found existing option group in Vendure: ${optionGroup.code} (ID: ${groupId})`,
+          );
+          // Query existing options for this group to populate the optionIdMap
+          await this.populateOptionIdMapFromExistingGroup(groupId, optionGroup);
+        } else {
+          // Create new option group if it doesn't exist in Vendure
+          const createdGroupId = await this.createOptionGroup(optionGroup);
+          if (createdGroupId) {
+            groupId = createdGroupId;
+            VendureAdapter.globalOptionGroupMap.set(optionGroup.code, groupId);
+            console.log(`Created option group: ${optionGroup.code} (ID: ${groupId})`);
+
+            // Create options for this group and track the mapping
+            if (optionGroup.values && optionGroup.values.length > 0) {
+              await this.createOptionsForGroup(
+                groupId,
+                optionGroup.values,
+                VendureAdapter.globalOptionIdMap,
+              );
+            }
           }
         }
       } else {
-        console.log(`Using existing option group: ${optionGroup.code} (ID: ${groupId})`);
+        console.log(
+          `Using existing option group from global map: ${optionGroup.code} (ID: ${groupId})`,
+        );
         // Query existing options for this group to populate the optionIdMap
         await this.populateOptionIdMapFromExistingGroup(groupId, optionGroup);
       }
