@@ -74,9 +74,9 @@ export class AkeneoMapper {
     return {
       id: model.code,
       sku: variants[0].identifier,
-      name: this.mapAttribute(variants[0].values, labelAttribute) || variants[0].identifier,
+      name: [{ locale: null, value: model.code, type: "pim_catalog_text", scope: null }],
       description: this.mapAttribute(model.values, "description") || "",
-      enabled: variants[0].enabled,
+      enabled: true,
       categories: model.categories || [],
       attributes: this.mapAllAttributes(model.values),
       variants: productVariants,
@@ -247,9 +247,15 @@ export class AkeneoMapper {
         // Get the first value that matches our locale/scope criteria
         const value = this.findBestAttributeValue(attributeValues);
         if (value && value.data) {
+          let optionId;
+          if (value.attribute_type === "pim_catalog_metric") {
+            optionId = `${value.data.amount} ${value.data.unit}`;
+          } else {
+            optionId = String(value.data);
+          }
           optionValues.push({
             optionGroupId: axis,
-            optionId: String(value.data),
+            optionId: optionId,
           });
         }
       }

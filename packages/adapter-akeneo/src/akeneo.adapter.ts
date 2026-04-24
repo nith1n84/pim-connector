@@ -104,15 +104,15 @@ export class AkeneoAdapter implements SourceAdapter {
         });
 
         let familyProductCount = 0;
-        const variantProductMap = new Map<string, AkeneoProduct[]>();
+        const variantProductsByParentId = new Map<string, AkeneoProduct[]>();
 
         for await (const items of iterator) {
           for (const item of items) {
             if (item.parent) {
-              if (!variantProductMap.has(item.parent)) {
-                variantProductMap.set(item.parent, []);
+              if (!variantProductsByParentId.has(item.parent)) {
+                variantProductsByParentId.set(item.parent, []);
               }
-              variantProductMap.get(item.parent)!.push(item);
+              variantProductsByParentId.get(item.parent)!.push(item);
               continue;
             }
 
@@ -121,9 +121,24 @@ export class AkeneoAdapter implements SourceAdapter {
           }
         }
 
-        if (variantProductMap.size > 0) {
-          for (const [parentProductId, variantProducts] of variantProductMap) {
-            const productModel = await this.getProductModel(parentProductId);
+        // process product models
+        if (variantProductsByParentId.size > 0) {
+          const variantProductsByRootModelCode = new Map<string, AkeneoProduct[]>();
+
+          for (const [parentProductId, variantProducts] of variantProductsByParentId) {
+            let productModel = await this.getProductModel(parentProductId);
+            if (!productModel) continue;
+            productModel = await this.getRootProductModel.call(this, productModel);
+            if (!productModel) continue;
+
+            if (!variantProductsByRootModelCode.has(productModel.code)) {
+              variantProductsByRootModelCode.set(productModel.code, []);
+            }
+            variantProductsByRootModelCode.get(productModel.code)!.push(...variantProducts);
+          }
+
+          for (const [rootModelCode, variantProducts] of variantProductsByRootModelCode) {
+            const productModel = await this.getProductModel(rootModelCode);
             if (!productModel) continue;
 
             const familyVariant = await this.getFamilyVariant(
@@ -155,6 +170,20 @@ export class AkeneoAdapter implements SourceAdapter {
 
     console.log(`Fetched total of ${products.length} products from all families`);
     return products;
+  }
+
+  async getRootProductModel(productModel: any, visited = new Set<string>()): Promise<any> {
+    if (!productModel) return null;
+
+    if (visited.has(productModel.code)) return productModel;
+    visited.add(productModel.code);
+
+    if (productModel.parent) {
+      const parentModel = await this.getProductModel(productModel.parent);
+      return this.getRootProductModel.call(this, parentModel, visited);
+    }
+
+    return productModel;
   }
 
   async getProductModel(code: string): Promise<AkeneoProductModel | null> {
@@ -331,8 +360,18 @@ export class AkeneoAdapter implements SourceAdapter {
         url: `/api/rest/v1/attributes/${attributeCode}/options`,
         method: "GET",
       });
-      // Akeneo attribute options endpoint returns options directly in the response
-      return response._embedded?.items || response.items || response || [];
+
+      const options: any[] = [];
+
+      const iterator = this.client.paginate<AkeneoProduct>(
+        `/api/rest/v1/attributes/${attributeCode}/options`,
+      );
+
+      for await (const items of iterator) {
+        options.push(...items);
+      }
+
+      return options;
     } catch (error) {
       console.warn(`Failed to fetch options for attribute ${attributeCode}:`, error);
       return [];
