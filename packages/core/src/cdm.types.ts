@@ -71,3 +71,11 @@ export interface Product {
   assets: Asset[];
   optionGroups?: OptionGroup[];
 }
+
+export interface Category {
+  id: string;
+  code: string; // Akeneo category code (maps to Vendure slug)
+  name: LocalizedString;
+  parentId: string | null; // For tree hierarchy
+  position: number; // Order within parent
+}

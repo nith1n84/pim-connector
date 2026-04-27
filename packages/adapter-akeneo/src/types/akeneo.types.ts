@@ -10,6 +10,8 @@ export interface AkeneoConfig {
   password?: string;
   locales: string[];
   scopes: string[];
+  syncCategories?: boolean;
+  categoryRootCode?: string;
 }
 
 export interface AkeneoTokenResponse {
@@ -111,4 +113,11 @@ export interface AkeneoOptionGroup {
     name: Record<string, string>;
     optionGroupId: string;
   }[];
+}
+
+export interface AkeneoCategory {
+  code: string;
+  parent: string | null;
+  labels: Record<string, string>;
+  updated: string;
 }

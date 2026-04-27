@@ -2,12 +2,14 @@ import {
   Asset,
   AttributeDefinition,
   AttributeValue,
+  Category,
   OptionGroup,
   Product,
   ProductVariant,
 } from "@pim-connector/core";
 import {
   AkeneoAttributeValue,
+  AkeneoCategory,
   AkeneoFamilyVariant,
   AkeneoProduct,
   AkeneoProductModel,
@@ -292,5 +294,25 @@ export class AkeneoMapper {
     // Or via the Asset Manager (which has a different API endpoint)
     // For now, we'll try to find common image attributes.
     return [];
+  }
+
+  /**
+   * Map an Akeneo category to the Canonical Data Model (CDM) Category.
+   */
+  mapToCategory(
+    akeneoCategory: AkeneoCategory,
+    categoryMap: Map<string, AkeneoCategory>,
+    position: number,
+  ): Category {
+    // Map parent code to parent ID (using parent's code as ID for consistency)
+    const parentId = akeneoCategory.parent ? akeneoCategory.parent : null;
+
+    return {
+      id: akeneoCategory.code, // Use code as ID for consistency
+      code: akeneoCategory.code, // This maps to Vendure slug
+      name: akeneoCategory.labels,
+      parentId,
+      position,
+    };
   }
 }

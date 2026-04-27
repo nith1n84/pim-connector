@@ -2,6 +2,7 @@ import axios, { AxiosInstance, AxiosRequestConfig } from "axios";
 import {
   AkeneoAttribute,
   AkeneoAttributeOption,
+  AkeneoCategory,
   AkeneoConfig,
   AkeneoFamily,
   AkeneoFamilyVariant,
@@ -282,5 +283,17 @@ export class AkeneoClient {
   clearCaches(): void {
     this.productModelCache.clear();
     this.familyVariantCache.clear();
+  }
+
+  /**
+   * Fetches all categories from Akeneo.
+   */
+  async getCategories(): Promise<AkeneoCategory[]> {
+    const categories: AkeneoCategory[] = [];
+    const iterator = this.paginate<AkeneoCategory>("/api/rest/v1/categories");
+    for await (const items of iterator) {
+      categories.push(...items);
+    }
+    return categories;
   }
 }

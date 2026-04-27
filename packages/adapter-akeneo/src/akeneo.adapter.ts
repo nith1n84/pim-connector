@@ -1,6 +1,7 @@
-import { Asset, AttributeDefinition, Product, SourceAdapter } from "@pim-connector/core";
+import { Asset, AttributeDefinition, Category, Product, SourceAdapter } from "@pim-connector/core";
 import { AkeneoClient } from "./client/akeneo.client.js";
 import { AkeneoMapper } from "./mappers/akeneo.mapper.js";
+import { AkeneoCategoryService } from "./services/akeneo-category.service.js";
 import { AkeneoProductService } from "./services/akeneo-product.service.js";
 import { AkeneoConfig } from "./types/akeneo.types.js";
 import { mapAkeneoTypeToCdmType } from "./utils/akeneo.utils.js";
@@ -14,11 +15,15 @@ export class AkeneoAdapter implements SourceAdapter {
   private client: AkeneoClient;
   private mapper: AkeneoMapper;
   private productService: AkeneoProductService;
+  private categoryService: AkeneoCategoryService;
+  private config: AkeneoConfig;
 
   constructor(config: AkeneoConfig) {
+    this.config = config;
     this.client = new AkeneoClient(config);
     this.mapper = new AkeneoMapper(config.locales, config.scopes);
     this.productService = new AkeneoProductService(this.client, this.mapper);
+    this.categoryService = new AkeneoCategoryService(this.client, this.mapper);
   }
 
   /**
@@ -90,5 +95,12 @@ export class AkeneoAdapter implements SourceAdapter {
    */
   async getAssets(): Promise<Asset[]> {
     return [];
+  }
+
+  /**
+   * Fetches all categories from Akeneo.
+   */
+  async getCategories(): Promise<Category[]> {
+    return this.categoryService.getAllCategories(this.config.categoryRootCode);
   }
 }
