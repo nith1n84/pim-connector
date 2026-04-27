@@ -18,21 +18,23 @@ async function main() {
   const logger = new BasicLogger("CLI");
   let config: any;
 
-  if (values.help || positionals.length === 0 || positionals[0] !== "sync") {
+  if (values.help || positionals.length === 0 || (positionals[0] !== "sync" && positionals[0] !== "sync-categories")) {
     console.log(`
-Usage: pim-sync sync [options]
+Usage: pim-sync <command> [options]
 
 Commands:
-  sync                 Run the synchronization engine
+  sync                 Run the product synchronization engine
+  sync-categories      Run the category/collection synchronization engine
 
 Options:
-  --since <date>      Run incremental sync since date (ISO format)
+  --since <date>      Run incremental sync since date (ISO format) (for product sync only)
   --dry-run, -d       Run without writing to target
   --help, -h          Show help
     `);
     process.exit(0);
   }
 
+  const command = positionals[0];
   logger.info(`Starting PIM Connector... ${values["dry-run"] ? "(DRY RUN)" : ""}`);
 
   // Load configuration - handle running from root or packages/cli
@@ -84,7 +86,9 @@ Options:
     dryRun: !!values["dry-run"],
   });
 
-  if (values.since) {
+  if (command === "sync-categories") {
+    await engine.runCategorySync();
+  } else if (values.since) {
     const sinceDate = new Date(values.since);
     if (isNaN(sinceDate.getTime())) {
       logger.error(`Invalid date format for --since: ${values.since}`);
