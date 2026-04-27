@@ -13,8 +13,8 @@ import {
   UPDATE_PRODUCT_VARIANTS,
   UPSERT_PRODUCT_ATTRIBUTES,
   VendureConfig,
-} from "./vendure.types.js";
-import { VendureMapper } from "./vendure.mapper.js";
+} from "./types/vendure.types.js";
+import { VendureMapper } from "./mappers/vendure.mapper.js";
 
 export class VendureAdapter implements TargetAdapter {
   readonly name = "vendure";

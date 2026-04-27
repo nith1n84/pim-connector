@@ -1,5 +1,5 @@
 import { AttributeValue, Product, ProductVariant } from "@pim-connector/core";
-import { VendureConfig } from "./vendure.types.js";
+import { VendureConfig } from "../types/vendure.types.js";
 
 export class VendureMapper {
   constructor(private config: VendureConfig = {} as VendureConfig) {}
