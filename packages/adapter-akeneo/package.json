@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@pim-connector/core": "workspace:*",
-    "axios": "^1.15.0"
+    "axios": "^1.15.0",
+    "p-limit": "^7.3.0"
   }
 }

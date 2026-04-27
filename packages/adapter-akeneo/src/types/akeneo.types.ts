@@ -20,6 +20,15 @@ export interface AkeneoTokenResponse {
   refresh_token?: string;
 }
 
+export interface AkeneoAttributeValue {
+  locale: string | null;
+  scope: string | null;
+  data: any;
+  linked_data?: any;
+  attribute_type: string;
+  reference_data_name?: string;
+}
+
 export interface AkeneoProduct {
   identifier: string;
   family?: string;
@@ -32,26 +41,6 @@ export interface AkeneoProduct {
   updated?: string;
   associations?: Record<string, any>;
   quantified_associations?: Record<string, any>;
-}
-
-export interface AkeneoAttributeValue {
-  locale: string | null;
-  scope: string | null;
-  data: any;
-  linked_data?: any;
-  attribute_type: string;
-  reference_data_name?: string;
-}
-
-export interface AkeneoPagingResponse<T> {
-  _links: {
-    self: { href: string };
-    first: { href: string };
-    next?: { href: string };
-  };
-  _embedded: {
-    items: T[];
-  };
 }
 
 export interface AkeneoProductModel {
@@ -67,6 +56,29 @@ export interface AkeneoProductModel {
   quantified_associations?: Record<string, any>;
 }
 
+export interface AkeneoFamily {
+  code: string;
+  labels: Record<string, string>;
+  attribute_as_label: string;
+  attribute_as_image: string | null;
+}
+
+export interface AkeneoAttribute {
+  code: string;
+  type: string;
+  labels: Record<string, string>;
+  localizable: boolean;
+  scopable: boolean;
+  group: string;
+}
+
+export interface AkeneoAttributeOption {
+  code: string;
+  attribute: string;
+  sort_order: number;
+  labels: Record<string, string>;
+}
+
 export interface AkeneoFamilyVariant {
   code: string;
   labels: Record<string, string>;
@@ -76,4 +88,27 @@ export interface AkeneoFamilyVariant {
     attributes: string[];
   }[];
   common_attributes: string[];
+}
+
+export interface AkeneoPagingResponse<T> {
+  _links: {
+    self: { href: string };
+    first: { href: string };
+    next?: { href: string };
+  };
+  _embedded: {
+    items: T[];
+  };
+}
+
+export interface AkeneoOptionGroup {
+  id: string;
+  code: string;
+  name: Record<string, string>;
+  values: {
+    id: string;
+    code: string;
+    name: Record<string, string>;
+    optionGroupId: string;
+  }[];
 }

@@ -11,7 +11,7 @@ import {
   AkeneoFamilyVariant,
   AkeneoProduct,
   AkeneoProductModel,
-} from "./akeneo.types.js";
+} from "../types/akeneo.types.js";
 
 export class AkeneoMapper {
   private attributeDefinitions: Map<string, AttributeDefinition> = new Map();
