@@ -1,5 +1,5 @@
 import { GraphQLClient } from "graphql-request";
-import { Asset, Product, TargetAdapter } from "@pim-connector/core";
+import { Asset, Category, Product, TargetAdapter } from "@pim-connector/core";
 import {
   ADD_OPTION_GROUP_TO_PRODUCT,
   CREATE_PRODUCT,
@@ -9,17 +9,20 @@ import {
   GET_PRODUCT_BY_VARIANT_SKU,
   GET_PRODUCT_OPTION_GROUPS,
   LOGIN,
+  UPDATE_COLLECTION,
   UPDATE_PRODUCT,
   UPDATE_PRODUCT_VARIANTS,
   UPSERT_PRODUCT_ATTRIBUTES,
   VendureConfig,
 } from "./types/vendure.types.js";
 import { VendureMapper } from "./mappers/vendure.mapper.js";
+import { VendureCollectionService } from "./services/vendure-collection.service.js";
 
 export class VendureAdapter implements TargetAdapter {
   readonly name = "vendure";
   private client: GraphQLClient;
   private mapper: VendureMapper;
+  private collectionService: VendureCollectionService;
   private static globalOptionIdMap: Map<string, string> = new Map(); // Shared across all products
   private static globalOptionGroupMap: Map<string, string> = new Map(); // Shared across all products
 
@@ -29,6 +32,7 @@ export class VendureAdapter implements TargetAdapter {
       this.setAuthToken(config.token);
     }
     this.mapper = new VendureMapper(config);
+    this.collectionService = new VendureCollectionService(this.client, this.mapper);
   }
 
   private setAuthToken(token: string) {
@@ -185,6 +189,20 @@ export class VendureAdapter implements TargetAdapter {
   async upsertAsset(asset: Asset): Promise<void> {
     console.log(`Upserting asset ${asset.url} to Vendure... (Not fully implemented)`);
     // TODO: Implement asset upload via Admin API
+  }
+
+  async upsertCollection(category: Category, targetId?: string, parentCollectionIdMap?: Map<string, string>): Promise<string> {
+    // Use targetId if provided (for updates), otherwise sync normally
+    if (targetId) {
+      const parentId = category.parentId ? (parentCollectionIdMap?.get(category.parentId) ?? null) : null;
+      const updateInput = this.mapper.mapToUpdateCollectionInput(targetId, category, parentId);
+      await this.requestWithRetry(UPDATE_COLLECTION, { input: updateInput });
+      return targetId;
+    }
+
+    // Use the provided parentCollectionIdMap, or fall back to global map
+    const mapToUse = parentCollectionIdMap ?? VendureCollectionService.getGlobalCollectionIdMap();
+    return this.collectionService.upsertCollection(category, mapToUse);
   }
 
   private async findOptionGroupByCode(code: string): Promise<string | null> {

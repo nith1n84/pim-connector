@@ -11,6 +11,7 @@ export interface VendureConfig {
   channelMap?: Record<string, string>;
   includeAttributes?: string[];
   excludeAttributes?: string[];
+  syncCategories?: boolean;
 }
 
 export const GET_PRODUCT_BY_VARIANT_SKU = gql`
@@ -154,6 +155,49 @@ export const ADD_OPTION_GROUP_TO_PRODUCT = gql`
         code
         name
       }
+    }
+  }
+`;
+
+export const CREATE_COLLECTION = gql`
+  mutation CreateCollection($input: CreateCollectionInput!) {
+    createCollection(input: $input) {
+      id
+      name
+      slug
+      parentId
+    }
+  }
+`;
+
+export const UPDATE_COLLECTION = gql`
+  mutation UpdateCollection($input: UpdateCollectionInput!) {
+    updateCollection(input: $input) {
+      id
+      name
+      slug
+    }
+  }
+`;
+
+export const GET_COLLECTION_BY_SLUG = gql`
+  query GetCollectionBySlug($slug: String!) {
+    collections(options: { filter: { slug: { eq: $slug } } }) {
+      items {
+        id
+        slug
+        name
+        parentId
+      }
+    }
+  }
+`;
+
+export const ASSIGN_COLLECTIONS_TO_CHANNEL = gql`
+  mutation AssignCollectionsToChannel($input: AssignCollectionsToChannelInput!) {
+    assignCollectionsToChannel(input: $input) {
+      id
+      name
     }
   }
 `;

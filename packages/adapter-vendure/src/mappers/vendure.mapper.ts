@@ -1,4 +1,4 @@
-import { AttributeValue, Product, ProductVariant } from "@pim-connector/core";
+import { AttributeValue, Category, Product, ProductVariant } from "@pim-connector/core";
 import { VendureConfig } from "../types/vendure.types.js";
 
 export class VendureMapper {
@@ -236,5 +236,82 @@ export class VendureMapper {
       .toLowerCase()
       .replace(/[^\w ]+/g, "")
       .replace(/ +/g, "-");
+  }
+
+  /**
+   * Map CDM Category to Vendure CreateCollectionInput
+   */
+  mapToCreateCollectionInput(category: Category, parentId: string | null) {
+    const translations = this.mapCategoryTranslations(category.name);
+
+    // Root collections should have parentId set to the Vendure root collection (id: "1")
+    const effectiveParentId = parentId ?? "1";
+
+    return {
+      parentId: effectiveParentId,
+      slug: category.code,
+      name: category.name,
+      translations,
+      isPrivate: false,
+      filters: [],
+    };
+  }
+
+  /**
+   * Map CDM Category to Vendure UpdateCollectionInput
+   */
+  mapToUpdateCollectionInput(vendureId: string, category: Category, parentId: string | null) {
+    const translations = this.mapCategoryTranslations(category.name);
+
+    const input: any = {
+      id: vendureId,
+      translations,
+      isPrivate: false,
+    };
+
+    // Root collections should have parentId set to the Vendure root collection (id: "1")
+    const effectiveParentId = parentId ?? "1";
+    input.parentId = effectiveParentId;
+
+    return input;
+  }
+
+  /**
+   * Map category labels to Vendure translation format
+   */
+  private mapCategoryTranslations(labels: Record<string, string>): Array<{
+    languageCode: string;
+    name: string;
+    description: string;
+    slug?: string;
+  }> {
+    const translations: Array<{
+      languageCode: string;
+      name: string;
+      description: string;
+      slug?: string;
+    }> = [];
+
+    for (const [locale, name] of Object.entries(labels)) {
+      const languageCode = this.config.localeMap?.[locale] || locale.split("_")[0];
+      translations.push({
+        languageCode,
+        name,
+        description: "", // Vendure requires description field
+        slug: this.sluggify(name),
+      });
+    }
+
+    // Fallback if no translations
+    if (translations.length === 0) {
+      translations.push({
+        languageCode: "en",
+        name: "Unnamed Collection",
+        description: "",
+        slug: "unnamed-collection",
+      });
+    }
+
+    return translations;
   }
 }
