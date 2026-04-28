@@ -116,10 +116,32 @@ export class VendureAdapter implements TargetAdapter {
     }
 
     // Handle Variants
-    if (product.variants && product.variants.length > 0) {
+    let variantsToUpsert = product.variants || [];
+
+    // Auto-create default variant for simple products (products without variants)
+    if (!variantsToUpsert || variantsToUpsert.length === 0) {
+      console.log(
+        `Product ${product.sku} has no variants, checking for existing variants in Vendure`,
+      );
+      const existingVariants = await this.getExistingVariants(productId);
+
+      if (existingVariants.length === 0) {
+        console.log(
+          `No existing variants found, creating default variant for product ${product.sku}`,
+        );
+        const defaultVariant = this.createDefaultVariant(product);
+        variantsToUpsert = [defaultVariant];
+      } else {
+        console.log(
+          `Found ${existingVariants.length} existing variants, skipping default variant creation`,
+        );
+      }
+    }
+
+    if (variantsToUpsert.length > 0) {
       await this.upsertVariants(
         productId,
-        product.variants,
+        variantsToUpsert,
         (existingProduct as any)?.variants,
         VendureAdapter.globalOptionIdMap,
       );
@@ -160,6 +182,45 @@ export class VendureAdapter implements TargetAdapter {
     }
   }
 
+  private async getExistingVariants(productId: string): Promise<any[]> {
+    const query = `
+      query GetProductVariants($id: ID!) {
+        product(id: $id) {
+          variants {
+            id
+            sku
+          }
+        }
+      }
+    `;
+
+    try {
+      const resp = await this.requestWithRetry<{
+        product: { variants: Array<{ id: string; sku: string }> };
+      }>(query, { id: productId });
+      return resp.product?.variants || [];
+    } catch (error) {
+      console.error(`Error getting existing variants for product ${productId}:`, error);
+      return [];
+    }
+  }
+
+  private createDefaultVariant(product: Product): any {
+    return {
+      id: product.sku || product.id,
+      sku: product.sku || product.id,
+      name: product.name,
+      prices: [
+        {
+          amount: 0,
+          currency: "AED",
+        },
+      ],
+      assets: [],
+      optionValues: [],
+    };
+  }
+
   private async upsertVariants(
     productId: string,
     variants: any[],
@@ -191,10 +252,16 @@ export class VendureAdapter implements TargetAdapter {
     // TODO: Implement asset upload via Admin API
   }
 
-  async upsertCollection(category: Category, targetId?: string, parentCollectionIdMap?: Map<string, string>): Promise<string> {
+  async upsertCollection(
+    category: Category,
+    targetId?: string,
+    parentCollectionIdMap?: Map<string, string>,
+  ): Promise<string> {
     // Use targetId if provided (for updates), otherwise sync normally
     if (targetId) {
-      const parentId = category.parentId ? (parentCollectionIdMap?.get(category.parentId) ?? null) : null;
+      const parentId = category.parentId
+        ? (parentCollectionIdMap?.get(category.parentId) ?? null)
+        : null;
       const updateInput = this.mapper.mapToUpdateCollectionInput(targetId, category, parentId);
       await this.requestWithRetry(UPDATE_COLLECTION, { input: updateInput });
       return targetId;
