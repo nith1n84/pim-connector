@@ -1,5 +1,5 @@
 import { GraphQLClient } from "graphql-request";
-import { Category } from "@pim-connector/core";
+import { Category, Logger } from "@pim-connector/core";
 import { VendureMapper } from "../mappers/vendure.mapper.js";
 import {
   CREATE_COLLECTION,
@@ -17,6 +17,7 @@ export class VendureCollectionService {
   constructor(
     private client: GraphQLClient,
     private mapper: VendureMapper,
+    private logger: Logger,
   ) {}
 
   /**
@@ -32,7 +33,9 @@ export class VendureCollectionService {
     let collectionId: string;
 
     if (existingCollection) {
-      console.log(`Updating existing collection ${category.code} (ID: ${existingCollection.id})`);
+      this.logger.debug(
+        `Updating existing collection ${category.code} (ID: ${existingCollection.id})`,
+      );
       const parentId = category.parentId
         ? (parentCollectionIdMap.get(category.parentId) ?? null)
         : null;
@@ -44,7 +47,7 @@ export class VendureCollectionService {
       await this.client.request(UPDATE_COLLECTION, { input: updateInput });
       collectionId = existingCollection.id;
     } else {
-      console.log(`Creating new collection ${category.code}`);
+      this.logger.debug(`Creating new collection ${category.code}`);
       const parentId = category.parentId
         ? (parentCollectionIdMap.get(category.parentId) ?? null)
         : null;
@@ -73,7 +76,7 @@ export class VendureCollectionService {
       );
       return resp.collections.items[0] || null;
     } catch (error) {
-      console.error(`Error finding collection by slug ${slug}:`, error);
+      this.logger.error(`Error finding collection by slug ${slug}:`, error);
       return null;
     }
   }

@@ -18,7 +18,11 @@ async function main() {
   const logger = new BasicLogger("CLI");
   let config: any;
 
-  if (values.help || positionals.length === 0 || (positionals[0] !== "sync" && positionals[0] !== "sync-categories")) {
+  if (
+    values.help ||
+    positionals.length === 0 ||
+    (positionals[0] !== "sync" && positionals[0] !== "sync-categories")
+  ) {
     console.log(`
 Usage: pim-sync <command> [options]
 

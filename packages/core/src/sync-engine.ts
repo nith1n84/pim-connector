@@ -162,7 +162,7 @@ export class SyncEngine {
         // Log action
         const action = targetId ? "Updating" : "Creating";
         this.logger.info(
-          `${this.options.dryRun ? "[DRY-RUN] " : ""}${action} product: ${sourceProduct.sku} (${sourceProduct.name})`,
+          `${this.options.dryRun ? "[DRY-RUN] " : ""}${action} product: ${sourceProduct.sku} ...`,
         );
 
         if (!this.options.dryRun) {

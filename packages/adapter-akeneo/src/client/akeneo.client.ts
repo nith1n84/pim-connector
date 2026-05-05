@@ -11,7 +11,7 @@ import {
   AkeneoProductModel,
   AkeneoTokenResponse,
 } from "../types/akeneo.types.js";
-import { OptionGroup, Page } from "@pim-connector/core";
+import { Logger, OptionGroup, Page } from "@pim-connector/core";
 import { formatAkeneoDate } from "../utils/akeneo.utils.js";
 
 /**
@@ -27,7 +27,10 @@ export class AkeneoClient {
   private productModelCache: Map<string, AkeneoProductModel | null> = new Map();
   private familyVariantCache: Map<string, AkeneoFamilyVariant | null> = new Map();
 
-  constructor(private config: AkeneoConfig) {
+  constructor(
+    private config: AkeneoConfig,
+    private logger: Logger,
+  ) {
     this.axiosInstance = axios.create({
       baseURL: config.url.endsWith("/") ? config.url.slice(0, -1) : config.url,
     });
@@ -90,7 +93,7 @@ export class AkeneoClient {
       this.tokenExpiry = Math.floor(Date.now() / 1000) + response.data.expires_in;
       return this.accessToken;
     } catch (error: any) {
-      console.error(
+      this.logger.error(
         "Failed to refresh Akeneo access token:",
         error.response?.data || error.message,
       );
@@ -267,11 +270,11 @@ export class AkeneoClient {
   /**
    * Fetches all option groups from Akeneo (simple select and multiselect attributes).
    */
-  async getOptionGroups(familyCodes?: string[]): Promise<OptionGroup[]> {
+  async getOptionGroups(familyCodes: string[]): Promise<OptionGroup[]> {
     const optionGroups: OptionGroup[] = [];
 
     try {
-      console.log("Fetching option groups from Akeneo...");
+      this.logger.debug(`Fetching option groups for [${familyCodes}] from Akeneo...`);
       const searchFilter = familyCodes
         ? {
             code: [
@@ -314,7 +317,7 @@ export class AkeneoClient {
         }
       }
     } catch (error) {
-      console.error("Failed to fetch option groups:", error);
+      this.logger.error("Failed to fetch option groups:", error);
     }
 
     return optionGroups;
@@ -336,7 +339,7 @@ export class AkeneoClient {
 
       return options;
     } catch (error) {
-      console.warn(`Failed to fetch options for attribute ${attributeCode}:`, error);
+      this.logger.warn(`Failed to fetch options for attribute ${attributeCode}:`, error);
       return [];
     }
   }

@@ -1,4 +1,4 @@
-import { Category } from "@pim-connector/core";
+import { Category, Logger } from "@pim-connector/core";
 import { AkeneoCategory } from "../types/akeneo.types.js";
 import { AkeneoClient } from "../client/akeneo.client.js";
 import { AkeneoMapper } from "../mappers/akeneo.mapper.js";
@@ -11,6 +11,7 @@ export class AkeneoCategoryService {
   constructor(
     private client: AkeneoClient,
     private mapper: AkeneoMapper,
+    private logger: Logger,
   ) {}
 
   /**
@@ -48,7 +49,7 @@ export class AkeneoCategoryService {
     const root = categories.find((c) => c.code === rootCode);
 
     if (!root) {
-      console.warn(`Root category ${rootCode} not found, returning all categories`);
+      this.logger.warn(`Root category ${rootCode} not found, returning all categories`);
       return categories;
     }
 

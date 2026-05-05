@@ -1,4 +1,4 @@
-import { Asset, Category, Product, SourceAdapter } from "@pim-connector/core";
+import { Asset, BasicLogger, Category, Product, SourceAdapter } from "@pim-connector/core";
 import { AkeneoClient } from "./client/akeneo.client.js";
 import { AkeneoMapper } from "./mappers/akeneo.mapper.js";
 import { AkeneoCategoryService } from "./services/akeneo-category.service.js";
@@ -16,13 +16,14 @@ export class AkeneoAdapter implements SourceAdapter {
   private productService: AkeneoProductService;
   private categoryService: AkeneoCategoryService;
   private config: AkeneoConfig;
+  logger = new BasicLogger("AKENEO ADAPTER");
 
   constructor(config: AkeneoConfig) {
     this.config = config;
-    this.client = new AkeneoClient(config);
+    this.client = new AkeneoClient(config, this.logger);
     this.mapper = new AkeneoMapper(config.locales, config.scopes);
-    this.productService = new AkeneoProductService(this.client, this.mapper);
-    this.categoryService = new AkeneoCategoryService(this.client, this.mapper);
+    this.productService = new AkeneoProductService(this.client, this.mapper, this.logger);
+    this.categoryService = new AkeneoCategoryService(this.client, this.mapper, this.logger);
   }
 
   /**
@@ -30,7 +31,7 @@ export class AkeneoAdapter implements SourceAdapter {
    * Caches attribute definitions, family settings, and option groups.
    */
   async initialize(): Promise<void> {
-    console.log(`Akeneo Adapter initialized `);
+    this.logger.info(`Akeneo Adapter initialized `);
   }
 
   async fetchProducts(page: number, limit: number, updatedDate?: Date): Promise<Product[]> {

@@ -1,5 +1,5 @@
 import { GraphQLClient } from "graphql-request";
-import { Asset, Category, Product, TargetAdapter } from "@pim-connector/core";
+import { Asset, BasicLogger, Category, Product, TargetAdapter } from "@pim-connector/core";
 import {
   ADD_OPTION_GROUP_TO_PRODUCT,
   CREATE_PRODUCT,
@@ -24,6 +24,7 @@ export class VendureAdapter implements TargetAdapter {
   private collectionService: VendureCollectionService;
   private static globalOptionIdMap: Map<string, string> = new Map(); // Shared across all products
   private static globalOptionGroupMap: Map<string, string> = new Map(); // Shared across all products
+  logger = new BasicLogger("VENDURE ADAPTER");
 
   constructor(private config: VendureConfig) {
     this.client = new GraphQLClient(config.url);
@@ -41,7 +42,7 @@ export class VendureAdapter implements TargetAdapter {
 
   async initialize(): Promise<void> {
     if (this.config.email && this.config.password) {
-      console.log("Authenticating with Vendure...");
+      this.logger.debug("Authenticating with Vendure...");
       try {
         const resp = await this.client.rawRequest<any>(LOGIN, {
           username: this.config.email,
@@ -51,15 +52,15 @@ export class VendureAdapter implements TargetAdapter {
         const token = resp.headers.get("vendure-auth-token");
         if (token) {
           this.setAuthToken(token);
-          console.log("Authenticated successfully via login.");
+          this.logger.debug("Authenticated successfully via login.");
         } else {
-          console.warn("Login successful but no token received in headers.");
+          this.logger.warn("Login successful but no token received in headers.");
         }
       } catch (error) {
-        console.error("Vendure authentication failed:", error);
+        this.logger.error("Vendure authentication failed:", error);
       }
     }
-    console.log("Vendure Adapter initialized");
+    this.logger.debug("Vendure Adapter initialized");
   }
 
   private async requestWithRetry<T>(query: string, variables: any): Promise<T> {
@@ -71,7 +72,7 @@ export class VendureAdapter implements TargetAdapter {
         return await this.client.request<T>(query, variables);
       } catch (error: any) {
         if (remRetries > 0 && error.message?.includes("database is locked")) {
-          console.warn(
+          this.logger.warn(
             `Database locked, retrying in ${currentDelay}ms... (${remRetries} attempts left)`,
           );
           await new Promise((resolve) => setTimeout(resolve, currentDelay));
@@ -90,12 +91,12 @@ export class VendureAdapter implements TargetAdapter {
 
     let productId: string;
     if (existingProduct) {
-      console.log(`Updating existing product ${product.sku} (ID: ${existingProduct.id})`);
+      this.logger.debug(`Updating existing product ${product.sku} (ID: ${existingProduct.id})`);
       const updateInput = this.mapper.mapToUpdateProductInput(existingProduct.id, product);
       await this.requestWithRetry(UPDATE_PRODUCT, { input: updateInput });
       productId = existingProduct.id;
     } else {
-      console.log(`Creating new product ${product.sku}`);
+      this.logger.debug(`Creating new product ${product.sku}`);
       const createInput = this.mapper.mapToCreateProductInput(product);
 
       const resp = await this.requestWithRetry<{ createProduct: { id: string } }>(CREATE_PRODUCT, {
@@ -105,9 +106,7 @@ export class VendureAdapter implements TargetAdapter {
     }
 
     // Handle Option Groups first (required for variants)
-    console.log(`Product ${product.sku} has optionGroups:`, product.optionGroups?.length || 0);
     if (product.optionGroups && product.optionGroups.length > 0) {
-      console.log(`Creating option groups for product ${product.sku}`);
       const { optionGroupMap, optionIdMap } = await this.ensureOptionGroupsExist(
         product.optionGroups,
       );
@@ -119,19 +118,19 @@ export class VendureAdapter implements TargetAdapter {
 
     // Auto-create default variant for simple products (products without variants)
     if (!variantsToUpsert || variantsToUpsert.length === 0) {
-      console.log(
+      this.logger.debug(
         `Product ${product.sku} has no variants, checking for existing variants in Vendure`,
       );
       const existingVariants = await this.getExistingVariants(productId);
 
       if (existingVariants.length === 0) {
-        console.log(
+        this.logger.debug(
           `No existing variants found, creating default variant for product ${product.sku}`,
         );
         const defaultVariant = this.createDefaultVariant(product);
         variantsToUpsert = [defaultVariant];
       } else {
-        console.log(
+        this.logger.debug(
           `Found ${existingVariants.length} existing variants, skipping default variant creation`,
         );
       }
@@ -148,7 +147,7 @@ export class VendureAdapter implements TargetAdapter {
 
     // Handle Custom Attributes
     // if (product.attributes && Object.keys(product.attributes).length > 0) {
-    //   console.log(`Syncing custom attributes for product ${product.sku}`);
+    //   this.logger.debug(`Syncing custom attributes for product ${product.sku}`);
     //   const attributeInputs = this.mapper.mapToProductAttributeInputs(
     //     productId,
     //     product.attributes,
@@ -176,7 +175,7 @@ export class VendureAdapter implements TargetAdapter {
       }>(GET_PRODUCT_BY_VARIANT_SKU, { sku });
       return resp.productVariants.items[0]?.product || null;
     } catch (error) {
-      console.error(`Error finding product by SKU ${sku}:`, error);
+      this.logger.error(`Error finding product by SKU ${sku}:`, error);
       return null;
     }
   }
@@ -199,7 +198,7 @@ export class VendureAdapter implements TargetAdapter {
       }>(query, { id: productId });
       return resp.product?.variants || [];
     } catch (error) {
-      console.error(`Error getting existing variants for product ${productId}:`, error);
+      this.logger.error(`Error getting existing variants for product ${productId}:`, error);
       return [];
     }
   }
@@ -247,7 +246,7 @@ export class VendureAdapter implements TargetAdapter {
   }
 
   async upsertAsset(asset: Asset): Promise<void> {
-    console.log(`Upserting asset ${asset.url} to Vendure... (Not fully implemented)`);
+    this.logger.debug(`Upserting asset ${asset.url} to Vendure... (Not fully implemented)`);
     // TODO: Implement asset upload via Admin API
   }
 
@@ -288,7 +287,7 @@ export class VendureAdapter implements TargetAdapter {
       }
       return null;
     } catch (error) {
-      console.error(`Error finding option group by code ${code}:`, error);
+      this.logger.error(`Error finding option group by code ${code}:`, error);
       return null;
     }
   }
@@ -313,7 +312,7 @@ export class VendureAdapter implements TargetAdapter {
       );
       return resp.createProductOptionGroup.id;
     } catch (error) {
-      console.error(`Failed to create option group ${optionGroup.code}:`, error);
+      this.logger.error(`Failed to create option group ${optionGroup.code}:`, error);
       return null;
     }
   }
@@ -341,14 +340,14 @@ export class VendureAdapter implements TargetAdapter {
         const resp = await this.requestWithRetry<{
           createProductOption: { id: string; code: string };
         }>(CREATE_PRODUCT_OPTION, { input });
-        console.log(
+        this.logger.debug(
           `Created option ${option.code} for group ${groupId} (ID: ${resp.createProductOption.id}, Vendure code: ${resp.createProductOption.code})`,
         );
 
         // Map Akeneo option code to Vendure option ID
         optionIdMap.set(option.code, resp.createProductOption.id);
       } catch (error) {
-        console.error(`Failed to create option ${option.code} for group ${groupId}:`, error);
+        this.logger.error(`Failed to create option ${option.code} for group ${groupId}:`, error);
       }
     }
   }
@@ -370,9 +369,6 @@ export class VendureAdapter implements TargetAdapter {
           groupId = existingGroupId;
           // Found existing option group in Vendure, add to global map
           VendureAdapter.globalOptionGroupMap.set(optionGroup.code, groupId);
-          console.log(
-            `Found existing option group in Vendure: ${optionGroup.code} (ID: ${groupId})`,
-          );
           // Query existing options for this group to populate the optionIdMap
           await this.populateOptionIdMapFromExistingGroup(groupId, optionGroup);
         } else {
@@ -381,7 +377,7 @@ export class VendureAdapter implements TargetAdapter {
           if (createdGroupId) {
             groupId = createdGroupId;
             VendureAdapter.globalOptionGroupMap.set(optionGroup.code, groupId);
-            console.log(`Created option group: ${optionGroup.code} (ID: ${groupId})`);
+            this.logger.debug(`Created option group: ${optionGroup.code} (ID: ${groupId})`);
 
             // Create options for this group and track the mapping
             if (optionGroup.values && optionGroup.values.length > 0) {
@@ -394,9 +390,6 @@ export class VendureAdapter implements TargetAdapter {
           }
         }
       } else {
-        console.log(
-          `Using existing option group from global map: ${optionGroup.code} (ID: ${groupId})`,
-        );
         // Query existing options for this group to populate the optionIdMap
         await this.populateOptionIdMapFromExistingGroup(groupId, optionGroup);
       }
@@ -432,7 +425,7 @@ export class VendureAdapter implements TargetAdapter {
 
       for (const optionGroupId of optionGroupIds) {
         if (existingGroupIds.has(optionGroupId)) {
-          console.log(
+          this.logger.debug(
             `Option group ${optionGroupId} already assigned to product ${productId}, skipping`,
           );
           continue;
@@ -443,16 +436,16 @@ export class VendureAdapter implements TargetAdapter {
             productId,
             optionGroupId,
           });
-          console.log(`Added option group ${optionGroupId} to product ${productId}`);
+          this.logger.debug(`Added option group ${optionGroupId} to product ${productId}`);
         } catch (error) {
-          console.error(
+          this.logger.error(
             `Failed to add option group ${optionGroupId} to product ${productId}:`,
             error,
           );
         }
       }
     } catch (error) {
-      console.error(`Failed to query product ${productId} for existing option groups:`, error);
+      this.logger.error(`Failed to query product ${productId} for existing option groups:`, error);
       // If query fails, try adding all groups anyway
       for (const optionGroupId of optionGroupIds) {
         try {
@@ -460,9 +453,9 @@ export class VendureAdapter implements TargetAdapter {
             productId,
             optionGroupId,
           });
-          console.log(`Added option group ${optionGroupId} to product ${productId}`);
+          this.logger.debug(`Added option group ${optionGroupId} to product ${productId}`);
         } catch (error) {
-          console.error(
+          this.logger.error(
             `Failed to add option group ${optionGroupId} to product ${productId}:`,
             error,
           );
@@ -493,26 +486,23 @@ export class VendureAdapter implements TargetAdapter {
       }>(query, { groupId });
 
       if (resp.productOptionGroup?.options) {
-        for (const akeneoOption of optionGroup.values || []) {
+        for (const option of optionGroup.values || []) {
           // Find matching Vendure option by comparing names
           const vendureOption: { id: string; code: string; name: any } | undefined =
             resp.productOptionGroup.options.find((vo: { id: string; code: string; name: any }) => {
-              const akeneoName = Object.values(akeneoOption.name || {})[0] as string;
+              const akeneoName = Object.values(option.name || {})[0] as string;
               const vendureName = Object.values(vo.name || {})[0] as string;
-              return akeneoName === vendureName || akeneoOption.code === vo.code;
+              return akeneoName === vendureName || option.code === vo.code;
             });
 
           if (vendureOption) {
             // Map Akeneo option code to Vendure option ID
-            VendureAdapter.globalOptionIdMap.set(akeneoOption.code, vendureOption.id);
-            console.log(
-              `Mapped Akeneo option ${akeneoOption.code} to Vendure ID ${vendureOption.id} (Vendure code: ${vendureOption.code})`,
-            );
+            VendureAdapter.globalOptionIdMap.set(option.code, vendureOption.id);
           }
         }
       }
     } catch (error) {
-      console.error(`Failed to query options for group ${groupId}:`, error);
+      this.logger.error(`Failed to query options for group ${groupId}:`, error);
     }
   }
 }

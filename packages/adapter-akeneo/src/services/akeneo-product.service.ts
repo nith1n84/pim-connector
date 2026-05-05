@@ -1,4 +1,4 @@
-import { AttributeDefinition, OptionGroup, Page, Product } from "@pim-connector/core";
+import { AttributeDefinition, Logger, OptionGroup, Page, Product } from "@pim-connector/core";
 import { AkeneoClient } from "../client/akeneo.client.js";
 import { AkeneoMapper } from "../mappers/akeneo.mapper.js";
 import { AkeneoProduct, AkeneoProductModel } from "../types/akeneo.types.js";
@@ -15,6 +15,7 @@ export class AkeneoProductService {
   constructor(
     private client: AkeneoClient,
     private mapper: AkeneoMapper,
+    private logger: Logger,
   ) {}
 
   /**
