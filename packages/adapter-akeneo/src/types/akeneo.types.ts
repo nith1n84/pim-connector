@@ -101,18 +101,8 @@ export interface AkeneoPagingResponse<T> {
   _embedded: {
     items: T[];
   };
-}
-
-export interface AkeneoOptionGroup {
-  id: string;
-  code: string;
-  name: Record<string, string>;
-  values: {
-    id: string;
-    code: string;
-    name: Record<string, string>;
-    optionGroupId: string;
-  }[];
+  current_page: number;
+  items_count: number;
 }
 
 export interface AkeneoCategory {

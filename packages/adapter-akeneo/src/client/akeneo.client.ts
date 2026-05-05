@@ -6,11 +6,13 @@ import {
   AkeneoConfig,
   AkeneoFamily,
   AkeneoFamilyVariant,
-  AkeneoOptionGroup,
   AkeneoPagingResponse,
+  AkeneoProduct,
   AkeneoProductModel,
   AkeneoTokenResponse,
 } from "../types/akeneo.types.js";
+import { OptionGroup, Page } from "@pim-connector/core";
+import { formatAkeneoDate } from "../utils/akeneo.utils.js";
 
 /**
  * Client for interacting with the Akeneo REST API.
@@ -120,6 +122,34 @@ export class AkeneoClient {
     });
   }
 
+  async fetchPage<T>(
+    url: string,
+    page: number = 1,
+    limit: number = 100,
+    params: Record<string, any> = {},
+  ): Promise<Page<T>> {
+    const queryParams = {
+      page: page,
+      limit: limit,
+      ...params,
+    };
+
+    const response: AkeneoPagingResponse<T> = await this.getPage<T>(url, queryParams);
+
+    const items = response._embedded.items;
+
+    const total = response.items_count ?? 0; // depends on Akeneo response
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      data: items,
+      page,
+      limit,
+      total,
+      totalPages,
+    };
+  }
+
   /**
    * Generator for paginated items
    * @param url - The endpoint URL
@@ -157,13 +187,38 @@ export class AkeneoClient {
    * Fetch all families with their label and image attributes
    * @returns Array of families
    */
-  async getFamilies(): Promise<AkeneoFamily[]> {
+  async getFamilies(codes?: string[]): Promise<AkeneoFamily[]> {
+    const searchFilter = codes
+      ? {
+          code: [
+            {
+              operator: "IN" as const,
+              value: codes,
+            },
+          ],
+        }
+      : {};
+
     const families: AkeneoFamily[] = [];
-    const iterator = this.paginate<AkeneoFamily>("/api/rest/v1/families");
+
+    const iterator = this.paginate<AkeneoFamily>("/api/rest/v1/families", {
+      search: JSON.stringify(searchFilter),
+    });
     for await (const items of iterator) {
       families.push(...items);
     }
     return families;
+  }
+
+  async getProducts(page: number, limit: number, updatedDate?: Date) {
+    const search = updatedDate
+      ? { updated: [{ operator: ">" as const, value: formatAkeneoDate(updatedDate) }] }
+      : {};
+
+    return await this.fetchPage<AkeneoProduct>("/api/rest/v1/products", page, limit, {
+      with_count: true,
+      search: JSON.stringify(search),
+    });
   }
 
   /**
@@ -212,19 +267,28 @@ export class AkeneoClient {
   /**
    * Fetches all option groups from Akeneo (simple select and multiselect attributes).
    */
-  async getOptionGroups(): Promise<AkeneoOptionGroup[]> {
-    const optionGroups: AkeneoOptionGroup[] = [];
+  async getOptionGroups(familyCodes?: string[]): Promise<OptionGroup[]> {
+    const optionGroups: OptionGroup[] = [];
 
     try {
       console.log("Fetching option groups from Akeneo...");
-      const searchFilter = {
-        type: [
-          {
-            operator: "IN" as const,
-            value: ["pim_catalog_simpleselect", "pim_catalog_multiselect"],
-          },
-        ],
-      };
+      const searchFilter = familyCodes
+        ? {
+            code: [
+              {
+                operator: "IN" as const,
+                value: familyCodes,
+              },
+            ],
+          }
+        : {
+            type: [
+              {
+                operator: "IN" as const,
+                value: ["pim_catalog_simpleselect", "pim_catalog_multiselect"],
+              },
+            ],
+          };
 
       const iterator = this.paginate<any>("/api/rest/v1/attributes", {
         search: JSON.stringify(searchFilter),

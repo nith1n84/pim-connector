@@ -1,10 +1,9 @@
-import { Asset, AttributeDefinition, Category, Product, SourceAdapter } from "@pim-connector/core";
+import { Asset, Category, Product, SourceAdapter } from "@pim-connector/core";
 import { AkeneoClient } from "./client/akeneo.client.js";
 import { AkeneoMapper } from "./mappers/akeneo.mapper.js";
 import { AkeneoCategoryService } from "./services/akeneo-category.service.js";
 import { AkeneoProductService } from "./services/akeneo-product.service.js";
 import { AkeneoConfig } from "./types/akeneo.types.js";
-import { mapAkeneoTypeToCdmType } from "./utils/akeneo.utils.js";
 
 /**
  * Adapter for Akeneo PIM.
@@ -12,8 +11,8 @@ import { mapAkeneoTypeToCdmType } from "./utils/akeneo.utils.js";
  */
 export class AkeneoAdapter implements SourceAdapter {
   readonly name = "akeneo";
-  private client: AkeneoClient;
-  private mapper: AkeneoMapper;
+  private readonly client: AkeneoClient;
+  private readonly mapper: AkeneoMapper;
   private productService: AkeneoProductService;
   private categoryService: AkeneoCategoryService;
   private config: AkeneoConfig;
@@ -31,49 +30,11 @@ export class AkeneoAdapter implements SourceAdapter {
    * Caches attribute definitions, family settings, and option groups.
    */
   async initialize(): Promise<void> {
-    console.log("Initializing Akeneo Adapter...");
-    const attributeDefinitions: Map<string, AttributeDefinition> = new Map();
-    const familyMappings: Map<string, { labelAttribute: string; imageAttribute: string | null }> =
-      new Map();
-
-    const rawDefinitions = await this.client.getAttributeDefinitions();
-    for (const raw of rawDefinitions) {
-      attributeDefinitions.set(raw.code, {
-        code: raw.code,
-        akeneoType: raw.type,
-        cdmType: mapAkeneoTypeToCdmType(raw.type),
-        localisable: raw.localizable,
-        scopable: raw.scopable,
-      });
-    }
-
-    const families = await this.client.getFamilies();
-    for (const family of families) {
-      familyMappings.set(family.code, {
-        labelAttribute: family.attribute_as_label || "name",
-        imageAttribute: family.attribute_as_image || null,
-      });
-    }
-
-    const optionGroups = await this.client.getOptionGroups();
-
-    // Configure internal components
-    this.mapper.setAttributeDefinitions(attributeDefinitions);
-    this.mapper.setFamilyMappings(familyMappings);
-    this.mapper.setOptionGroups(optionGroups);
-
-    this.productService.setFamilyMappings(familyMappings);
-
-    console.log(
-      `Akeneo Adapter initialized with ${attributeDefinitions.size} attribute definitions and ${familyMappings.size} family mappings`,
-    );
+    console.log(`Akeneo Adapter initialized `);
   }
 
-  /**
-   * Fetches all products from Akeneo.
-   */
-  async getProducts(): Promise<Product[]> {
-    return this.productService.getAllProducts();
+  async fetchProducts(page: number, limit: number, updatedDate?: Date): Promise<Product[]> {
+    return this.productService.fetchProducts(page, limit, updatedDate);
   }
 
   /**
@@ -86,8 +47,8 @@ export class AkeneoAdapter implements SourceAdapter {
   /**
    * Fetches products updated since a specific date.
    */
-  async getUpdatedProducts(since: Date): Promise<Product[]> {
-    return this.productService.getUpdatedProducts(since);
+  async fetchUpdatedProducts(page: number, limit: number, since?: Date): Promise<Product[]> {
+    return this.productService.fetchProducts(page, limit, since);
   }
 
   /**

@@ -79,3 +79,11 @@ export interface Category {
   parentId: string | null; // For tree hierarchy
   position: number; // Order within parent
 }
+
+export interface Page<T> {
+  data: T[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}

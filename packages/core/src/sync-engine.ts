@@ -22,7 +22,8 @@ export class SyncEngine {
     this.logger.info(`Starting full sync from ${this.source.name} to ${this.target.name}`);
 
     try {
-      const sourceProducts = await this.source.getProducts();
+      const sourceProducts = await this.source.fetchProducts(1, 20);
+
       this.logger.info(`Fetched ${sourceProducts.length} products from source.`);
 
       await this.syncProducts(sourceProducts);
@@ -37,6 +38,10 @@ export class SyncEngine {
     }
   }
 
+  async runProductSync(): Promise<void> {
+    this.logger.info(`Starting product sync from ${this.source.name} to ${this.target.name}`);
+  }
+
   /**
    * Runs an incremental synchronization since the specified date.
    */
@@ -44,11 +49,11 @@ export class SyncEngine {
     this.logger.info(`Starting incremental sync since ${since.toISOString()}`);
 
     try {
-      if (!this.source.getUpdatedProducts) {
+      if (!this.source.fetchUpdatedProducts) {
         throw new Error(`Source adapter ${this.source.name} does not support incremental sync.`);
       }
 
-      const updatedProducts = await this.source.getUpdatedProducts(since);
+      const updatedProducts = await this.source.fetchUpdatedProducts(1, 20, since);
       this.logger.info(`Fetched ${updatedProducts.length} updated products.`);
 
       await this.syncProducts(updatedProducts);
@@ -109,7 +114,11 @@ export class SyncEngine {
         );
 
         if (!this.options.dryRun) {
-          const newTargetId = await this.target.upsertCollection(sourceCategory, targetId, parentCollectionIdMap);
+          const newTargetId = await this.target.upsertCollection(
+            sourceCategory,
+            targetId,
+            parentCollectionIdMap,
+          );
 
           // Track in identity map
           this.identityMap.setMapping(sourceId, newTargetId);
@@ -140,6 +149,7 @@ export class SyncEngine {
    * Processes a list of source products through transformation and target upsert.
    */
   private async syncProducts(sourceProducts: any[]): Promise<void> {
+    if (sourceProducts.length === 0) return;
     let successCount = 0;
     let errorCount = 0;
 

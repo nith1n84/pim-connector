@@ -1,9 +1,7 @@
-import { AttributeDefinition, Product } from "@pim-connector/core";
-import pLimit from "p-limit";
+import { AttributeDefinition, OptionGroup, Page, Product } from "@pim-connector/core";
 import { AkeneoClient } from "../client/akeneo.client.js";
 import { AkeneoMapper } from "../mappers/akeneo.mapper.js";
 import { AkeneoProduct, AkeneoProductModel } from "../types/akeneo.types.js";
-import { formatAkeneoDate } from "../utils/akeneo.utils.js";
 
 /**
  * Service for handling Akeneo product data operations.
@@ -28,51 +26,12 @@ export class AkeneoProductService {
     this.familyMappings = mappings;
   }
 
-  /**
-   * Fetches all products across all families.
-   */
-  async getAllProducts(): Promise<Product[]> {
-    if (this.familyMappings.size === 0) {
-      return [];
-    }
-
-    this.client.clearCaches();
-
-    const limit = pLimit(5);
-    const tasks = Array.from(this.familyMappings.entries()).map(([familyCode, familyMapping]) => {
-      return limit(async () => {
-        const searchFilter = {
-          family: [{ operator: "IN" as const, value: [familyCode] }],
-        };
-        return this.fetchProcessProducts(familyCode, familyMapping, searchFilter);
-      });
-    });
-
-    const results = await Promise.all(tasks);
-    return results.flat();
-  }
-
-  /**
-   * Fetches products updated since a specific date.
-   */
-  async getUpdatedProducts(since: Date): Promise<Product[]> {
-    if (this.familyMappings.size === 0) {
-      return [];
-    }
-
-    const limit = pLimit(5);
-    const tasks = Array.from(this.familyMappings.entries()).map(([familyCode, familyMapping]) => {
-      return limit(async () => {
-        const searchFilter = {
-          family: [{ operator: "IN" as const, value: [familyCode] }],
-          updated: [{ operator: ">" as const, value: formatAkeneoDate(since) }],
-        };
-        return this.fetchProcessProducts(familyCode, familyMapping, searchFilter);
-      });
-    });
-
-    const results = await Promise.all(tasks);
-    return results.flat();
+  async getPaginatedProducts(
+    page: number,
+    limit: number,
+    updatedDate?: Date,
+  ): Promise<Page<AkeneoProduct>> {
+    return this.client.getProducts(page, limit, updatedDate);
   }
 
   /**
@@ -95,35 +54,60 @@ export class AkeneoProductService {
     }
   }
 
-  /**
-   * Helper to fetch and process products for a specific family and search filter.
-   */
-  private async fetchProcessProducts(
-    familyCode: string,
-    familyMapping: { labelAttribute: string; imageAttribute: string | null },
-    searchFilter: Record<string, any>,
-  ): Promise<Product[]> {
-    const products: Product[] = [];
-    try {
-      const productBatchIterator = this.client.paginate<AkeneoProduct>("/api/rest/v1/products", {
-        search: JSON.stringify(searchFilter),
+  async fetchProducts(page: number, limit: number, updatedDate?: Date): Promise<Product[]> {
+    const akeneoProducts = (await this.getPaginatedProducts(page, limit, updatedDate)).data;
+
+    if (akeneoProducts.length === 0) {
+      return [];
+    }
+
+    const familyToProducts = new Map<string, AkeneoProduct[]>();
+
+    for (const product of akeneoProducts) {
+      const family = product.family;
+      if (!family) {
+        continue;
+      }
+      if (!familyToProducts.has(family)) {
+        familyToProducts.set(family, []);
+      }
+      familyToProducts.get(family)!.push(product);
+    }
+
+    const familyCodes: string[] = [...familyToProducts.keys()];
+
+    const families = await this.client.getFamilies(familyCodes);
+    const familyMappings: Map<string, { labelAttribute: string; imageAttribute: string | null }> =
+      new Map();
+    for (const family of families) {
+      familyMappings.set(family.code, {
+        labelAttribute: family.attribute_as_label || "name",
+        imageAttribute: family.attribute_as_image || null,
       });
+    }
+
+    const allProducts: Product[] = [];
+
+    for (const [familyCode, products] of familyToProducts) {
+      const familyMapping = familyMappings.get(familyCode);
+
+      if (!familyMapping) {
+        continue;
+      }
 
       const variantProductsByParentId = new Map<string, AkeneoProduct[]>();
 
-      for await (const productBatch of productBatchIterator) {
-        for (const akeneoProduct of productBatch) {
-          if (akeneoProduct.parent) {
-            const parentId = akeneoProduct.parent;
-            if (!variantProductsByParentId.has(parentId)) {
-              variantProductsByParentId.set(parentId, []);
-            }
-            variantProductsByParentId.get(parentId)!.push(akeneoProduct);
-            continue;
+      for (const akeneoProduct of products) {
+        if (akeneoProduct.parent) {
+          const parentId = akeneoProduct.parent;
+          if (!variantProductsByParentId.has(parentId)) {
+            variantProductsByParentId.set(parentId, []);
           }
-
-          products.push(this.mapper.mapToProduct(akeneoProduct, familyMapping));
+          variantProductsByParentId.get(parentId)!.push(akeneoProduct);
+          continue;
         }
+
+        allProducts.push(this.mapper.mapToProduct(akeneoProduct, familyMapping));
       }
 
       if (variantProductsByParentId.size > 0) {
@@ -151,23 +135,54 @@ export class AkeneoProductService {
             productModel.family_variant,
           );
           if (!familyVariant) continue;
+          const allAxes = new Set<string>();
+          for (const variantSet of familyVariant.variant_attribute_sets) {
+            for (const axis of variantSet.axes) {
+              allAxes.add(axis);
+            }
+          }
+
+          const optionGroups = await this.resolveOptionGroups(Array.from(allAxes));
 
           const product = this.mapper.mapVariantsToProduct(
             productModel,
             familyVariant,
             variants,
             familyMapping,
+            optionGroups,
           );
 
           if (product) {
-            products.push(product);
+            allProducts.push(product);
           }
         }
       }
-    } catch (error) {
-      console.error(`Failed to fetch products for family ${familyCode}:`, error);
     }
-    return products;
+
+    return allProducts;
+  }
+
+  private async resolveOptionGroups(axes: string[]): Promise<OptionGroup[]> {
+    const existingOptionGroups = this.mapper.getOptionGroups();
+
+    const existingMap = new Map(
+      existingOptionGroups.map((group: OptionGroup) => [group.code, group]),
+    );
+
+    const existing = axes
+      .map((axis) => existingMap.get(axis))
+      .flatMap((group) => (group ? [group] : []));
+
+    const missingAxes = axes.filter((axis) => !existingMap.has(axis));
+
+    // Fetch only missing ones
+    const fetchedOptionGroups = missingAxes.length
+      ? await this.client.getOptionGroups(missingAxes)
+      : [];
+    this.mapper.setOptionGroups([...existingOptionGroups, ...fetchedOptionGroups]);
+
+    // Combine existing + fetched
+    return [...existing, ...fetchedOptionGroups];
   }
 
   /**

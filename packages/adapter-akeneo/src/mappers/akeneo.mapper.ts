@@ -1,6 +1,5 @@
 import {
   Asset,
-  AttributeDefinition,
   AttributeValue,
   Category,
   OptionGroup,
@@ -16,9 +15,6 @@ import {
 } from "../types/akeneo.types.js";
 
 export class AkeneoMapper {
-  private attributeDefinitions: Map<string, AttributeDefinition> = new Map();
-  private familyMappings: Map<string, { labelAttribute: string; imageAttribute: string | null }> =
-    new Map();
   private optionGroups: OptionGroup[] = [];
 
   constructor(
@@ -30,27 +26,19 @@ export class AkeneoMapper {
     this.optionGroups = optionGroups;
   }
 
-  setAttributeDefinitions(definitions: Map<string, AttributeDefinition>) {
-    this.attributeDefinitions = definitions;
-  }
-
-  setFamilyMappings(
-    mappings: Map<string, { labelAttribute: string; imageAttribute: string | null }>,
-  ) {
-    this.familyMappings = mappings;
+  getOptionGroups() {
+    return this.optionGroups;
   }
 
   mapVariantsToProduct(
     model: AkeneoProductModel,
     familyVariant: AkeneoFamilyVariant,
     variants: AkeneoProduct[],
-    familyMapping?: { labelAttribute: string; imageAttribute: string | null },
+    familyMapping: { labelAttribute: string; imageAttribute: string | null },
+    optionGroups?: OptionGroup[],
   ): Product | null {
     const labelAttribute = familyMapping?.labelAttribute || "name";
     const imageAttribute = familyMapping?.imageAttribute || null;
-
-    // Get relevant option groups for variant axes
-    const relevantOptionGroups = this.getRelevantOptionGroups(familyVariant);
 
     const productVariants: ProductVariant[] = [];
 
@@ -83,7 +71,7 @@ export class AkeneoMapper {
       attributes: this.mapAllAttributes(model.values),
       variants: productVariants,
       assets: this.mapAssets(model),
-      optionGroups: relevantOptionGroups,
+      optionGroups: optionGroups,
     };
   }
 
@@ -135,11 +123,8 @@ export class AkeneoMapper {
         scope: v.scope,
       };
 
-      // Resolve attribute type from definition if not provided in the value object
-      const type = v.attribute_type || this.attributeDefinitions.get(attributeCode)?.akeneoType;
-
       // todo: revisit the mapping of attribute types to CDM types check all cases
-      switch (type) {
+      switch (v.attribute_type) {
         case "pim_catalog_identifier":
         case "pim_catalog_simpleselect":
         case "pim_catalog_text":
@@ -198,31 +183,6 @@ export class AkeneoMapper {
       mappedAttributes[code] = this.mapAttribute(attributes, code);
     }
     return mappedAttributes;
-  }
-
-  /**
-   * Get relevant option groups for variant axes.
-   */
-  private getRelevantOptionGroups(familyVariant: AkeneoFamilyVariant): OptionGroup[] {
-    const relevantGroups: OptionGroup[] = [];
-
-    // Get all axes from all variant attribute sets
-    const allAxes = new Set<string>();
-    for (const variantSet of familyVariant.variant_attribute_sets) {
-      for (const axis of variantSet.axes) {
-        allAxes.add(axis);
-      }
-    }
-
-    // Find option groups that match these axes
-    for (const axis of allAxes) {
-      const optionGroup = this.optionGroups.find((og) => og.code === axis);
-      if (optionGroup) {
-        relevantGroups.push(optionGroup);
-      }
-    }
-
-    return relevantGroups;
   }
 
   /**
