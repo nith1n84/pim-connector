@@ -12,7 +12,6 @@ import {
   UPDATE_COLLECTION,
   UPDATE_PRODUCT,
   UPDATE_PRODUCT_VARIANTS,
-  UPSERT_PRODUCT_ATTRIBUTES,
   VendureConfig,
 } from "./types/vendure.types.js";
 import { VendureMapper } from "./mappers/vendure.mapper.js";
@@ -148,24 +147,24 @@ export class VendureAdapter implements TargetAdapter {
     }
 
     // Handle Custom Attributes
-    if (product.attributes && Object.keys(product.attributes).length > 0) {
-      console.log(`Syncing custom attributes for product ${product.sku}`);
-      const attributeInputs = this.mapper.mapToProductAttributeInputs(
-        productId,
-        product.attributes,
-        {
-          includeAttributes: this.config.includeAttributes,
-          excludeAttributes: this.config.excludeAttributes,
-        },
-      );
-
-      if (attributeInputs.length > 0) {
-        await this.requestWithRetry(UPSERT_PRODUCT_ATTRIBUTES, {
-          productId,
-          input: attributeInputs,
-        });
-      }
-    }
+    // if (product.attributes && Object.keys(product.attributes).length > 0) {
+    //   console.log(`Syncing custom attributes for product ${product.sku}`);
+    //   const attributeInputs = this.mapper.mapToProductAttributeInputs(
+    //     productId,
+    //     product.attributes,
+    //     {
+    //       includeAttributes: this.config.includeAttributes,
+    //       excludeAttributes: this.config.excludeAttributes,
+    //     },
+    //   );
+    //
+    //   if (attributeInputs.length > 0) {
+    //     await this.requestWithRetry(UPSERT_PRODUCT_ATTRIBUTES, {
+    //       productId,
+    //       input: attributeInputs,
+    //     });
+    //   }
+    // }
 
     return productId;
   }
