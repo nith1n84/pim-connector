@@ -32,7 +32,7 @@ export class VendureAdapter implements TargetAdapter {
       this.setAuthToken(config.token);
     }
     this.mapper = new VendureMapper(config);
-    this.collectionService = new VendureCollectionService(this.client, this.mapper);
+    this.collectionService = new VendureCollectionService(this.client, this.mapper, this.logger);
   }
 
   private setAuthToken(token: string) {

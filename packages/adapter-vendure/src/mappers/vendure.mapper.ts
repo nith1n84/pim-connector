@@ -244,13 +244,13 @@ export class VendureMapper {
   mapToCreateCollectionInput(category: Category, parentId: string | null) {
     const translations = this.mapCategoryTranslations(category.name);
 
-    // Root collections should have parentId set to the Vendure root collection (id: "1")
-    const effectiveParentId = parentId ?? "1";
+    // Root collections should have parentId set to the Vendure root collection (id: null)
+    const effectiveParentId = parentId ?? null;
 
     return {
       parentId: effectiveParentId,
-      slug: category.code,
-      name: category.name,
+      // slug: category.code,
+      // name: category.name,
       translations,
       isPrivate: false,
       filters: [],
@@ -270,8 +270,7 @@ export class VendureMapper {
     };
 
     // Root collections should have parentId set to the Vendure root collection (id: "1")
-    const effectiveParentId = parentId ?? "1";
-    input.parentId = effectiveParentId;
+    input.parentId = parentId ?? "1";
 
     return input;
   }
