@@ -68,6 +68,15 @@ Options:
     process.exit(1);
   }
 
+  // Initialize identity map with persistence
+  const identitiesPath = join(dirname(configPath), "identities.json");
+  const identityMap = new IdentityMap(identitiesPath);
+  await identityMap.load();
+
+  const categoryIdentityPath = join(dirname(configPath), "category.json");
+  const categoryIdentityMap = new IdentityMap(categoryIdentityPath);
+  await categoryIdentityMap.load();
+
   const source = new AkeneoAdapter(config.source.config);
   const target = new VendureAdapter({
     ...config.target.config,
@@ -75,17 +84,13 @@ Options:
     retryDelayMs: config.syncOptions?.retryDelayMs,
     includeAttributes: config.mapping.includeAttributes,
     excludeAttributes: config.mapping.excludeAttributes,
+    categoryIdentityMap: categoryIdentityMap,
   });
-
-  // Initialize identity map with persistence
-  const identitiesPath = join(dirname(configPath), "identities.json");
-  const identityMap = new IdentityMap(identitiesPath);
-  await identityMap.load();
 
   await source.initialize();
   await target.initialize();
 
-  const engine = new SyncEngine(source, target, identityMap, logger, {
+  const engine = new SyncEngine(source, target, identityMap, categoryIdentityMap, logger, {
     delayMs: config.syncOptions?.delayMs,
     dryRun: !!values["dry-run"],
   });

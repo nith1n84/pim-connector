@@ -1,4 +1,5 @@
 import { gql } from "graphql-request";
+import { IdentityMap } from "@pim-connector/core";
 
 export interface VendureConfig {
   url: string;
@@ -12,8 +13,21 @@ export interface VendureConfig {
   includeAttributes?: string[];
   excludeAttributes?: string[];
   syncCategories?: boolean;
+  categoryIdentityMap: IdentityMap;
 }
 
+export interface CreateProductVariantsResponse {
+  createProductVariants: {
+    id: string;
+    sku: string;
+  }[];
+}
+export interface UpdateProductVariantsResponse {
+  updateProductVariants: {
+    id: string;
+    sku: string;
+  }[];
+}
 export const GET_PRODUCT_BY_VARIANT_SKU = gql`
   query GetProductByVariantSku($sku: String!) {
     productVariants(options: { filter: { sku: { eq: $sku } } }) {

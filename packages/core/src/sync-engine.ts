@@ -11,6 +11,7 @@ export class SyncEngine {
     private source: SourceAdapter,
     private target: TargetAdapter,
     private identityMap: IdentityMap,
+    private categoryIdentityMap: IdentityMap,
     private logger: Logger,
     private options: SyncOptions = {},
   ) {}
@@ -105,7 +106,7 @@ export class SyncEngine {
       try {
         // Check local identity map
         const sourceId = sourceCategory.id || sourceCategory.code;
-        const targetId = this.identityMap.getTargetId(sourceId);
+        const targetId = this.categoryIdentityMap.getTargetId(sourceId);
 
         // Log action
         const action = targetId ? "Updating" : "Creating";
@@ -121,7 +122,7 @@ export class SyncEngine {
           );
 
           // Track in identity map
-          this.identityMap.setMapping(sourceId, newTargetId);
+          this.categoryIdentityMap.setMapping(sourceId, newTargetId);
           parentCollectionIdMap.set(sourceCategory.code, newTargetId);
           successCount++;
         } else {
@@ -140,7 +141,7 @@ export class SyncEngine {
     }
 
     // Save identity map persistence
-    await this.identityMap.save();
+    await this.categoryIdentityMap.save();
 
     this.logger.info(`Category sync statistics: ${successCount} succeeded, ${errorCount} failed.`);
   }

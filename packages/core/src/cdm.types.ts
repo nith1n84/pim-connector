@@ -36,6 +36,7 @@ export interface ProductVariant {
   sku: string;
   name: AttributeValue[];
   attributes: Record<string, AttributeValue[]>;
+  categories: string[];
   prices: Price[];
   assets: Asset[];
   optionValues?: {

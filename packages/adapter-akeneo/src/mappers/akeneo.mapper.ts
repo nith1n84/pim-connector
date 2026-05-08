@@ -58,6 +58,7 @@ export class AkeneoMapper {
         attributes: this.mapAllAttributes(variant.values),
         assets: this.mapAssets(variant),
         optionValues,
+        categories: variant.categories ?? [],
       });
     });
 

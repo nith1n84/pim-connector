@@ -1,17 +1,27 @@
 import { GraphQLClient } from "graphql-request";
-import { Asset, BasicLogger, Category, Product, TargetAdapter } from "@pim-connector/core";
+import {
+  Asset,
+  BasicLogger,
+  Category,
+  IdentityMap,
+  Product,
+  ProductVariant,
+  TargetAdapter,
+} from "@pim-connector/core";
 import {
   ADD_OPTION_GROUP_TO_PRODUCT,
   CREATE_PRODUCT,
   CREATE_PRODUCT_OPTION,
   CREATE_PRODUCT_OPTION_GROUP,
   CREATE_PRODUCT_VARIANTS,
+  CreateProductVariantsResponse,
   GET_PRODUCT_BY_VARIANT_SKU,
   GET_PRODUCT_OPTION_GROUPS,
   LOGIN,
   UPDATE_COLLECTION,
   UPDATE_PRODUCT,
   UPDATE_PRODUCT_VARIANTS,
+  UpdateProductVariantsResponse,
   VendureConfig,
 } from "./types/vendure.types.js";
 import { VendureMapper } from "./mappers/vendure.mapper.js";
@@ -24,6 +34,7 @@ export class VendureAdapter implements TargetAdapter {
   private collectionService: VendureCollectionService;
   private static globalOptionIdMap: Map<string, string> = new Map(); // Shared across all products
   private static globalOptionGroupMap: Map<string, string> = new Map(); // Shared across all products
+  private categoryIdentityMap: IdentityMap;
   logger = new BasicLogger("VENDURE ADAPTER");
 
   constructor(private config: VendureConfig) {
@@ -33,6 +44,7 @@ export class VendureAdapter implements TargetAdapter {
     }
     this.mapper = new VendureMapper(config);
     this.collectionService = new VendureCollectionService(this.client, this.mapper, this.logger);
+    this.categoryIdentityMap = config.categoryIdentityMap;
   }
 
   private setAuthToken(token: string) {
@@ -238,11 +250,91 @@ export class VendureAdapter implements TargetAdapter {
     }
 
     if (toCreate.length > 0) {
-      await this.requestWithRetry(CREATE_PRODUCT_VARIANTS, { input: toCreate });
+      const response = await this.requestWithRetry<CreateProductVariantsResponse>(
+        CREATE_PRODUCT_VARIANTS,
+        {
+          input: toCreate,
+        },
+      );
+
+      const categoryProductsAssociationMap: Map<string, string[]> = new Map();
+
+      // Lookup map for variant with sku
+      const variantBySku = new Map(
+        variants.map((variant: ProductVariant) => [variant.sku, variant]),
+      );
+
+      response.createProductVariants.forEach(({ id, sku }) => {
+        const variant = variantBySku.get(sku);
+
+        if (!variant) return;
+
+        if (!variant.categories || variant.categories.length === 0) return;
+
+        variant.categories.forEach((category) => {
+          let productIds = categoryProductsAssociationMap.get(category);
+
+          if (!productIds) {
+            productIds = [];
+            categoryProductsAssociationMap.set(category, productIds);
+          }
+
+          productIds.push(id);
+        });
+      });
+      if (categoryProductsAssociationMap.size > 0) {
+        await this.syncVariantWithCategory(categoryProductsAssociationMap);
+      }
     }
     if (toUpdate.length > 0) {
-      await this.requestWithRetry(UPDATE_PRODUCT_VARIANTS, { input: toUpdate });
+      const resp = await this.requestWithRetry<UpdateProductVariantsResponse>(
+        UPDATE_PRODUCT_VARIANTS,
+        {
+          input: toUpdate,
+        },
+      );
+      console.log(resp);
     }
+  }
+
+  async syncVariantWithCategory(categoryProductsAssociationMap: Map<string, string[]>) {
+    const updatedCollections = [];
+
+    for (const [category, variantIds] of categoryProductsAssociationMap.entries()) {
+      const vendureCategoryId = this.categoryIdentityMap.getTargetId(category);
+
+      if (!vendureCategoryId) {
+        continue;
+      }
+
+      const updateInput = {
+        id: vendureCategoryId,
+        filters: [
+          {
+            code: "variant-id-filter",
+            arguments: [
+              {
+                name: "variantIds",
+                value: JSON.stringify(variantIds),
+              },
+              {
+                name: "combineWithAnd",
+                value: "true",
+              },
+            ],
+          },
+        ],
+      };
+
+      const res = await this.requestWithRetry(UPDATE_COLLECTION, {
+        input: updateInput,
+      });
+
+      // @ts-ignore
+      updatedCollections.push(res.updateCollection.id);
+    }
+
+    console.log(updatedCollections);
   }
 
   async upsertAsset(asset: Asset): Promise<void> {
