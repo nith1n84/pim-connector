@@ -15,6 +15,7 @@ import {
   CREATE_PRODUCT_OPTION_GROUP,
   CREATE_PRODUCT_VARIANTS,
   CreateProductVariantsResponse,
+  GET_PRODUCT_BY_ID,
   GET_PRODUCT_BY_VARIANT_SKU,
   GET_PRODUCT_OPTION_GROUPS,
   LOGIN,
@@ -23,6 +24,7 @@ import {
   UPDATE_PRODUCT_VARIANTS,
   UpdateProductVariantsResponse,
   VendureConfig,
+  VendureProduct,
 } from "./types/vendure.types.js";
 import { VendureMapper } from "./mappers/vendure.mapper.js";
 import { VendureCollectionService } from "./services/vendure-collection.service.js";
@@ -99,7 +101,9 @@ export class VendureAdapter implements TargetAdapter {
 
   async upsertProduct(product: Product, targetId?: string): Promise<string> {
     if (!product.sku) return "";
-    const existingProduct = targetId ? { id: targetId } : await this.findProductBySku(product.sku);
+    const existingProduct = targetId
+      ? await this.getProductById(targetId)
+      : await this.findProductBySku(product.sku);
 
     let productId: string;
     if (existingProduct) {
@@ -152,7 +156,7 @@ export class VendureAdapter implements TargetAdapter {
       await this.upsertVariants(
         productId,
         variantsToUpsert,
-        (existingProduct as any)?.variants,
+        existingProduct?.variants,
         VendureAdapter.globalOptionIdMap,
       );
     }
@@ -180,7 +184,7 @@ export class VendureAdapter implements TargetAdapter {
     return productId;
   }
 
-  private async findProductBySku(sku: string): Promise<any | null> {
+  private async findProductBySku(sku: string): Promise<VendureProduct | null> {
     try {
       const resp = await this.client.request<{
         productVariants: { items: any[] };
@@ -188,6 +192,18 @@ export class VendureAdapter implements TargetAdapter {
       return resp.productVariants.items[0]?.product || null;
     } catch (error) {
       this.logger.error(`Error finding product by SKU ${sku}:`, error);
+      return null;
+    }
+  }
+
+  private async getProductById(id: string): Promise<VendureProduct | null> {
+    try {
+      const resp = await this.client.request<{
+        product: VendureProduct;
+      }>(GET_PRODUCT_BY_ID, { id });
+      return resp.product || null;
+    } catch (error) {
+      this.logger.error(`Error finding product by ID ${id}:`, error);
       return null;
     }
   }

@@ -16,6 +16,19 @@ export interface VendureConfig {
   categoryIdentityMap: IdentityMap;
 }
 
+export interface VendureProduct {
+  id: string;
+  variants: VendureVariants[];
+}
+
+export interface VendureVariants {
+  id: string;
+  sku: string;
+  // price: number;
+  // stockOnHand: number;
+  // product: VendureProduct;
+}
+
 export interface CreateProductVariantsResponse {
   createProductVariants: {
     id: string;
@@ -41,6 +54,18 @@ export const GET_PRODUCT_BY_VARIANT_SKU = gql`
             sku
           }
         }
+      }
+    }
+  }
+`;
+
+export const GET_PRODUCT_BY_ID = gql`
+  query GetProductById($id: ID!) {
+    product(id: $id) {
+      id
+      variants {
+        id
+        sku
       }
     }
   }
