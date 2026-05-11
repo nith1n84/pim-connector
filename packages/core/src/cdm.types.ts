@@ -20,10 +20,12 @@ export interface Option {
 
 export interface Asset {
   id: string;
-  url: string;
+  url?: string;
   type: "image" | "document" | "other";
   altText?: string;
   mimeType?: string;
+  buffer?: Buffer;
+  name?: string;
 }
 
 export interface Price {
@@ -70,6 +72,11 @@ export interface Product {
   attributes: Record<string, AttributeValue[]>;
   variants: ProductVariant[];
   assets: Asset[];
+  assetFiles?: {
+    buffer: Buffer;
+    filename: string;
+    mimeType: string;
+  }[];
   optionGroups?: OptionGroup[];
 }
 

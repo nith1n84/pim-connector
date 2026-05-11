@@ -10,6 +10,7 @@ import {
 } from "@pim-connector/core";
 import {
   ADD_OPTION_GROUP_TO_PRODUCT,
+  CREATE_ASSETS,
   CREATE_PRODUCT,
   CREATE_PRODUCT_OPTION,
   CREATE_PRODUCT_OPTION_GROUP,
@@ -38,6 +39,7 @@ export class VendureAdapter implements TargetAdapter {
   private static globalOptionGroupMap: Map<string, string> = new Map(); // Shared across all products
   private categoryIdentityMap: IdentityMap;
   logger = new BasicLogger("VENDURE ADAPTER");
+  private token: string = "";
 
   constructor(private config: VendureConfig) {
     this.client = new GraphQLClient(config.url);
@@ -52,6 +54,7 @@ export class VendureAdapter implements TargetAdapter {
   private setAuthToken(token: string) {
     this.client.setHeader("Authorization", `Bearer ${token}`);
     this.client.setHeader("vendure-auth-token", token);
+    this.token = token;
   }
 
   async initialize(): Promise<void> {
@@ -105,15 +108,30 @@ export class VendureAdapter implements TargetAdapter {
       ? await this.getProductById(targetId)
       : await this.findProductBySku(product.sku);
 
+    const assetFiles = product.assets;
+    const assetIds: string[] = [];
+    if (assetFiles && assetFiles?.length > 0) {
+      for (const file of assetFiles) {
+        if (file.buffer && file.name) {
+          const result = await this.upload(file.buffer, file.name, file.mimeType);
+          assetIds.push(...result);
+        }
+      }
+    }
+
     let productId: string;
     if (existingProduct) {
       this.logger.debug(`Updating existing product ${product.sku} (ID: ${existingProduct.id})`);
-      const updateInput = this.mapper.mapToUpdateProductInput(existingProduct.id, product);
+      const updateInput = this.mapper.mapToUpdateProductInput(
+        existingProduct.id,
+        product,
+        assetIds,
+      );
       await this.requestWithRetry(UPDATE_PRODUCT, { input: updateInput });
       productId = existingProduct.id;
     } else {
       this.logger.debug(`Creating new product ${product.sku}`);
-      const createInput = this.mapper.mapToCreateProductInput(product);
+      const createInput = this.mapper.mapToCreateProductInput(product, assetIds);
 
       const resp = await this.requestWithRetry<{ createProduct: { id: string } }>(CREATE_PRODUCT, {
         input: createInput,
@@ -612,5 +630,67 @@ export class VendureAdapter implements TargetAdapter {
     } catch (error) {
       this.logger.error(`Failed to query options for group ${groupId}:`, error);
     }
+  }
+
+  private async upload(
+    buffer: Buffer,
+    filename: string,
+    mimeType = "image/png",
+  ): Promise<string[]> {
+    const form = new FormData();
+
+    // GraphQL multipart operations
+    form.append(
+      "operations",
+      JSON.stringify({
+        query: CREATE_ASSETS,
+        variables: {
+          input: [
+            {
+              file: null,
+            },
+          ],
+        },
+      }),
+    );
+
+    // File map
+    form.append(
+      "map",
+      JSON.stringify({
+        "1": ["variables.input.0.file"],
+      }),
+    );
+
+    const blob = new Blob([new Uint8Array(buffer)], {
+      type: mimeType,
+    });
+
+    form.append("1", blob, filename);
+
+    const response = await fetch(this.config.url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.token}`,
+        "vendure-auth-token": this.token,
+      },
+      body: form,
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+
+      throw new Error(`Vendure upload failed: ${response.status} ${response.statusText}\n${text}`);
+    }
+
+    const json: any = await response.json();
+
+    if (json.errors) {
+      throw new Error(JSON.stringify(json.errors, null, 2));
+    }
+
+    const assets = json.data?.createAssets ?? [];
+
+    return assets.map((asset: any) => asset.id);
   }
 }

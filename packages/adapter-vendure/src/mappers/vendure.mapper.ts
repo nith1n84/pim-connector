@@ -61,7 +61,7 @@ export class VendureMapper {
   /**
    * Map CDM Product to Vendure CreateProductInput
    */
-  mapToCreateProductInput(product: Product) {
+  mapToCreateProductInput(product: Product, assetIds: string[]) {
     const nameTranslations = this.mapTranslations(product.name, product.sku || "Unknown Product");
     const descriptionTranslations = this.mapTranslations(product.description, "");
 
@@ -79,6 +79,8 @@ export class VendureMapper {
     return {
       enabled: product.enabled,
       translations,
+      assetIds,
+      featuredAssetId: assetIds.length > 0 ? assetIds[0] : undefined,
       // customFields: { externalId: product.id } // Optional: if externalId custom field exists
     };
   }
@@ -86,7 +88,7 @@ export class VendureMapper {
   /**
    * Map CDM Product to Vendure UpdateProductInput
    */
-  mapToUpdateProductInput(vendureId: string, product: Product) {
+  mapToUpdateProductInput(vendureId: string, product: Product, assetIds: string[]) {
     const nameTranslations = this.mapTranslations(product.name, product.sku || "Unknown Product");
     const descriptionTranslations = this.mapTranslations(product.description, "");
 
@@ -105,6 +107,8 @@ export class VendureMapper {
       id: vendureId,
       enabled: product.enabled,
       translations,
+      assetIds,
+      featuredAssetId: assetIds.length > 0 ? assetIds[0] : undefined,
     };
   }
 

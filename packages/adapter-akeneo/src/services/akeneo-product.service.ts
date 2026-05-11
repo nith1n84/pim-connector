@@ -2,6 +2,7 @@ import { AttributeDefinition, Logger, OptionGroup, Page, Product } from "@pim-co
 import { AkeneoClient } from "../client/akeneo.client.js";
 import { AkeneoMapper } from "../mappers/akeneo.mapper.js";
 import { AkeneoProduct, AkeneoProductModel } from "../types/akeneo.types.js";
+import { AkeneoAssetService } from "./akeneo-asset.service.js";
 
 /**
  * Service for handling Akeneo product data operations.
@@ -11,12 +12,15 @@ export class AkeneoProductService {
   private attributeDefinitions: Map<string, AttributeDefinition> = new Map();
   private familyMappings: Map<string, { labelAttribute: string; imageAttribute: string | null }> =
     new Map();
+  private akeneoAssetService: AkeneoAssetService;
 
   constructor(
     private client: AkeneoClient,
     private mapper: AkeneoMapper,
     private logger: Logger,
-  ) {}
+  ) {
+    this.akeneoAssetService = new AkeneoAssetService(client, logger);
+  }
 
   /**
    * Sets family mappings required for product processing.
@@ -49,7 +53,7 @@ export class AkeneoProductService {
         ? this.familyMappings.get(akeneoProduct.family)
         : undefined;
 
-      return this.mapper.mapToProduct(akeneoProduct, familyMapping);
+      return this.mapper.mapToProduct(akeneoProduct, [], familyMapping);
     } catch (error) {
       return null;
     }
@@ -108,7 +112,22 @@ export class AkeneoProductService {
           continue;
         }
 
-        allProducts.push(this.mapper.mapToProduct(akeneoProduct, familyMapping));
+        const mediaFiles: any[] = [];
+        if (familyMapping.imageAttribute) {
+          const mediaArray = akeneoProduct.values[familyMapping.imageAttribute];
+          if (mediaArray && Array.isArray(mediaArray)) {
+            for (const media of mediaArray) {
+              if (media && media.attribute_type === "pim_catalog_image") {
+                const file = await this.akeneoAssetService.downloadProductMediaFile(media.data);
+                if (file) {
+                  mediaFiles.push(file);
+                }
+              }
+            }
+          }
+        }
+
+        allProducts.push(this.mapper.mapToProduct(akeneoProduct, mediaFiles, familyMapping));
       }
 
       if (variantProductsByParentId.size > 0) {

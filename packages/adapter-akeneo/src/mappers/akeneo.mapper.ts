@@ -56,7 +56,7 @@ export class AkeneoMapper {
           },
         ],
         attributes: this.mapAllAttributes(variant.values),
-        assets: this.mapAssets(variant),
+        assets: [],
         optionValues,
         categories: variant.categories ?? [],
       });
@@ -71,7 +71,7 @@ export class AkeneoMapper {
       categories: model.categories || [],
       attributes: this.mapAllAttributes(model.values),
       variants: productVariants,
-      assets: this.mapAssets(model),
+      assets: [],
       optionGroups: optionGroups,
     };
   }
@@ -81,10 +81,10 @@ export class AkeneoMapper {
    */
   mapToProduct(
     akeneoProduct: AkeneoProduct,
+    mediaFiles?: any[],
     familyMapping?: { labelAttribute: string; imageAttribute: string | null },
   ): Product {
     const labelAttribute = familyMapping?.labelAttribute || "name";
-    const imageAttribute = familyMapping?.imageAttribute || null;
 
     return {
       id: akeneoProduct.identifier,
@@ -94,8 +94,8 @@ export class AkeneoMapper {
       enabled: akeneoProduct.enabled,
       categories: akeneoProduct.categories || [],
       attributes: this.mapAllAttributes(akeneoProduct.values),
-      variants: [], // Simple products only for now
-      assets: this.mapAssets(akeneoProduct),
+      variants: [],
+      assets: mediaFiles ? this.mapAssets(mediaFiles) : [],
     };
   }
 
@@ -248,13 +248,16 @@ export class AkeneoMapper {
   }
 
   /**
-   * Map assets if available (placeholder for now).
+   * Map assets
    */
-  private mapAssets(product: AkeneoProduct | AkeneoProductModel): Asset[] {
-    // In Akeneo, assets are often stored in 'media_file' or 'image' attribute types
-    // Or via the Asset Manager (which has a different API endpoint)
-    // For now, we'll try to find common image attributes.
-    return [];
+  private mapAssets(mediaFiles: any[]): Asset[] {
+    return mediaFiles.map((media) => ({
+      id: media.code,
+      name: media.filename,
+      buffer: media.buffer,
+      mimeType: media.mimeType,
+      type: "image" as const,
+    }));
   }
 
   /**

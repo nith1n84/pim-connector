@@ -240,3 +240,17 @@ export const ASSIGN_COLLECTIONS_TO_CHANNEL = gql`
     }
   }
 `;
+
+export const CREATE_ASSETS = gql`
+  mutation CreateAssets($input: [CreateAssetInput!]!) {
+    createAssets(input: $input) {
+      ... on Asset {
+        id
+        name
+      }
+      ... on ErrorResult {
+        message
+      }
+    }
+  }
+`;
