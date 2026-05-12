@@ -93,6 +93,7 @@ Options:
   const engine = new SyncEngine(source, target, identityMap, categoryIdentityMap, logger, {
     delayMs: config.syncOptions?.delayMs,
     dryRun: !!values["dry-run"],
+    batchSize: config.syncOptions?.batchSize,
   });
 
   if (command === "sync-categories") {

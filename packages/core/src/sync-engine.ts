@@ -4,6 +4,7 @@ import { IdentityMap } from "./identity-map.js";
 export interface SyncOptions {
   delayMs?: number;
   dryRun?: boolean;
+  batchSize?: number;
 }
 
 export class SyncEngine {
@@ -23,16 +24,32 @@ export class SyncEngine {
     this.logger.info(`Starting full sync from ${this.source.name} to ${this.target.name}`);
 
     try {
-      const sourceProducts = await this.source.fetchProducts(1, 20);
+      const batchSize = this.options.batchSize || 10;
+      let page = 1;
+      let totalProductsSynced = 0;
 
-      this.logger.info(`Fetched ${sourceProducts.length} products from source.`);
+      while (true) {
+        this.logger.info(`Fetching page ${page} with batch size ${batchSize}`);
+        const sourceProducts = await this.source.fetchProducts(page, batchSize);
 
-      await this.syncProducts(sourceProducts);
+        if (sourceProducts.length === 0) {
+          this.logger.info(`No more products found on page ${page}. Stopping sync.`);
+          break;
+        }
+
+        this.logger.info(`Fetched ${sourceProducts.length} products from page ${page}.`);
+        await this.syncProducts(sourceProducts);
+        totalProductsSynced += sourceProducts.length;
+
+        page++;
+      }
 
       // Save identity map persistence
       await this.identityMap.save();
 
-      this.logger.info("Full sync completed successfully.");
+      this.logger.info(
+        `Full sync completed successfully. Total products synced: ${totalProductsSynced}.`,
+      );
     } catch (error) {
       this.logger.error("Full sync failed:", error);
       throw error;
@@ -54,15 +71,34 @@ export class SyncEngine {
         throw new Error(`Source adapter ${this.source.name} does not support incremental sync.`);
       }
 
-      const updatedProducts = await this.source.fetchUpdatedProducts(1, 20, since);
-      this.logger.info(`Fetched ${updatedProducts.length} updated products.`);
+      const batchSize = this.options.batchSize || 20;
+      let page = 1;
+      let totalProductsSynced = 0;
 
-      await this.syncProducts(updatedProducts);
+      while (true) {
+        this.logger.info(`Fetching updated products page ${page} with batch size ${batchSize}`);
+        const updatedProducts = await this.source.fetchUpdatedProducts(page, batchSize, since);
+
+        if (updatedProducts.length === 0) {
+          this.logger.info(
+            `No more updated products found on page ${page}. Stopping incremental sync.`,
+          );
+          break;
+        }
+
+        this.logger.info(`Fetched ${updatedProducts.length} updated products from page ${page}.`);
+        await this.syncProducts(updatedProducts);
+        totalProductsSynced += updatedProducts.length;
+
+        page++;
+      }
 
       // Save identity map persistence
       await this.identityMap.save();
 
-      this.logger.info("Incremental sync completed successfully.");
+      this.logger.info(
+        `Incremental sync completed successfully. Total products synced: ${totalProductsSynced}.`,
+      );
     } catch (error) {
       this.logger.error("Incremental sync failed:", error);
       throw error;

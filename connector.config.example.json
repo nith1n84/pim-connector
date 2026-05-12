@@ -38,6 +38,7 @@
   "syncOptions": {
     "delayMs": 150,
     "retries": 3,
-    "retryDelayMs": 1000
+    "retryDelayMs": 1000,
+    "batchSize": 20
   }
 }
