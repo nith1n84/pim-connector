@@ -122,35 +122,6 @@ export const LOGIN = gql`
   }
 `;
 
-export const UPSERT_PRODUCT_ATTRIBUTES = gql`
-  mutation UpsertProductAttributes($productId: ID!, $input: [UpsertProductAttributeInput!]!) {
-    upsertProductAttributes(productId: $productId, input: $input) {
-      id
-      code
-      value
-    }
-  }
-`;
-
-export const DELETE_PRODUCT_ATTRIBUTES = gql`
-  mutation DeleteProductAttributesByProduct($productId: ID!) {
-    deleteProductAttributesByProduct(productId: $productId)
-  }
-`;
-
-export const GET_PRODUCT_ATTRIBUTES = gql`
-  query GetProductAttributes($productId: ID!) {
-    productAttributes(productId: $productId) {
-      id
-      code
-      value
-      type
-      locale
-      scope
-    }
-  }
-`;
-
 export const CREATE_PRODUCT_OPTION_GROUP = gql`
   mutation CreateProductOptionGroup($input: CreateProductOptionGroupInput!) {
     createProductOptionGroup(input: $input) {
@@ -228,15 +199,6 @@ export const GET_COLLECTION_BY_SLUG = gql`
         name
         parentId
       }
-    }
-  }
-`;
-
-export const ASSIGN_COLLECTIONS_TO_CHANNEL = gql`
-  mutation AssignCollectionsToChannel($input: AssignCollectionsToChannelInput!) {
-    assignCollectionsToChannel(input: $input) {
-      id
-      name
     }
   }
 `;

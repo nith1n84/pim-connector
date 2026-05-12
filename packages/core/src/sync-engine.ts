@@ -94,10 +94,6 @@ export class SyncEngine {
     }
   }
 
-  async runProductSync(): Promise<void> {
-    this.logger.info(`Starting product sync from ${this.source.name} to ${this.target.name}`);
-  }
-
   /**
    * Runs an incremental synchronization since the specified date.
    */

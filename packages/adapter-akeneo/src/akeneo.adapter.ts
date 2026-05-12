@@ -16,7 +16,7 @@ export class AkeneoAdapter implements SourceAdapter {
   private productService: AkeneoProductService;
   private categoryService: AkeneoCategoryService;
   private config: AkeneoConfig;
-  logger = new BasicLogger("AKENEO ADAPTER");
+  logger = new BasicLogger("AKENEO ADAPTER", process.env.LOG_LEVEL);
 
   constructor(config: AkeneoConfig) {
     this.config = config;

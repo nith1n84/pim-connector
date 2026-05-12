@@ -38,7 +38,6 @@ export class AkeneoMapper {
     optionGroups?: OptionGroup[],
   ): Product | null {
     const labelAttribute = familyMapping?.labelAttribute || "name";
-    const imageAttribute = familyMapping?.imageAttribute || null;
 
     const productVariants: ProductVariant[] = [];
 
@@ -180,7 +179,7 @@ export class AkeneoMapper {
     attributes: Record<string, AkeneoAttributeValue[]>,
   ): Record<string, any> {
     const mappedAttributes: Record<string, any> = {};
-    for (const [code, values] of Object.entries(attributes)) {
+    for (const [code] of Object.entries(attributes)) {
       mappedAttributes[code] = this.mapAttribute(attributes, code);
     }
     return mappedAttributes;

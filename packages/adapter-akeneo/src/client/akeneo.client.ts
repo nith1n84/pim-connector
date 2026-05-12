@@ -1,7 +1,6 @@
 import axios, { AxiosInstance, AxiosRequestConfig } from "axios";
 import {
   AkeneoAssetFamily,
-  AkeneoAttribute,
   AkeneoAttributeOption,
   AkeneoCategory,
   AkeneoConfig,
@@ -170,22 +169,9 @@ export class AkeneoClient {
       yield response._embedded.items;
 
       currentUrl = response._links.next?.href;
-      // After first page, Akeneo's next link includes full path, so we don't need base URL or params again
+      // After first page, Akeneo's next link includes full path, so we don't need Base-URL or params again
       currentParams = undefined;
     }
-  }
-
-  /**
-   * Fetch all attribute definitions
-   * @returns Array of attributes
-   */
-  async getAttributeDefinitions(): Promise<AkeneoAttribute[]> {
-    const definitions: AkeneoAttribute[] = [];
-    const iterator = this.paginate<AkeneoAttribute>("/api/rest/v1/attributes");
-    for await (const items of iterator) {
-      definitions.push(...items);
-    }
-    return definitions;
   }
 
   /**

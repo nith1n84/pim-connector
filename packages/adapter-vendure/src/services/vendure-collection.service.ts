@@ -22,7 +22,7 @@ export class VendureCollectionService {
 
   /**
    * Upserts a collection to Vendure.
-   * Checks if collection exists by slug, then creates or updates accordingly.
+   * Checks if a collection exists by slug, then creates or updates accordingly.
    */
   async upsertCollection(
     category: Category,
@@ -33,9 +33,6 @@ export class VendureCollectionService {
     let collectionId: string;
 
     if (existingCollection) {
-      this.logger.debug(
-        `Updating existing collection ${category.code} (ID: ${existingCollection.id})`,
-      );
       const parentId = category.parentId
         ? (parentCollectionIdMap.get(category.parentId) ?? null)
         : null;
@@ -47,7 +44,6 @@ export class VendureCollectionService {
       await this.client.request(UPDATE_COLLECTION, { input: updateInput });
       collectionId = existingCollection.id;
     } else {
-      this.logger.debug(`Creating new collection ${category.code}`);
       const parentId = category.parentId
         ? (parentCollectionIdMap.get(category.parentId) ?? null)
         : null;

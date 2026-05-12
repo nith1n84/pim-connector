@@ -21,15 +21,6 @@ export class AkeneoProductService {
     this.akeneoAssetService = new AkeneoAssetService(client, logger);
   }
 
-  /**
-   * Sets family mappings required for product processing.
-   */
-  setFamilyMappings(
-    mappings: Map<string, { labelAttribute: string; imageAttribute: string | null }>,
-  ) {
-    this.familyMappings = mappings;
-  }
-
   async getPaginatedProducts(
     page: number,
     limit: number,

@@ -45,7 +45,6 @@ export class AkeneoCategoryService {
    * Filters categories to only include those under a specific root category.
    */
   private filterByRoot(categories: AkeneoCategory[], rootCode: string): AkeneoCategory[] {
-    const filtered: AkeneoCategory[] = [];
     const root = categories.find((c) => c.code === rootCode);
 
     if (!root) {

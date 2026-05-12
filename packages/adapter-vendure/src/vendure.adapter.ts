@@ -1,6 +1,5 @@
 import { GraphQLClient } from "graphql-request";
 import {
-  Asset,
   BasicLogger,
   Category,
   IdentityMap,
@@ -33,14 +32,14 @@ import { AssetMappingService } from "./services/asset-mapping.service.js";
 
 export class VendureAdapter implements TargetAdapter {
   readonly name = "vendure";
-  private client: GraphQLClient;
-  private mapper: VendureMapper;
+  private readonly client: GraphQLClient;
+  private readonly mapper: VendureMapper;
   private collectionService: VendureCollectionService;
   private assetMappingService: AssetMappingService;
   private static globalOptionIdMap: Map<string, string> = new Map(); // Shared across all products
   private static globalOptionGroupMap: Map<string, string> = new Map(); // Shared across all products
   private categoryIdentityMap: IdentityMap;
-  logger = new BasicLogger("VENDURE ADAPTER");
+  logger = new BasicLogger("VENDURE ADAPTER", process.env.LOG_LEVEL);
   private token: string = "";
 
   constructor(private config: VendureConfig) {
@@ -64,7 +63,6 @@ export class VendureAdapter implements TargetAdapter {
     await this.assetMappingService.loadMapping();
 
     if (this.config.email && this.config.password) {
-      this.logger.debug("Authenticating with Vendure...");
       try {
         const resp = await this.client.rawRequest<any>(LOGIN, {
           username: this.config.email,
@@ -74,7 +72,7 @@ export class VendureAdapter implements TargetAdapter {
         const token = resp.headers.get("vendure-auth-token");
         if (token) {
           this.setAuthToken(token);
-          this.logger.debug("Authenticated successfully via login.");
+          this.logger.info("Authenticated successfully with Vendure.");
         } else {
           this.logger.warn("Login successful but no token received in headers.");
         }
@@ -82,7 +80,7 @@ export class VendureAdapter implements TargetAdapter {
         this.logger.error("Vendure authentication failed:", error);
       }
     }
-    this.logger.debug("Vendure Adapter initialized");
+    this.logger.info("Vendure Adapter initialized");
   }
 
   private async requestWithRetry<T>(query: string, variables: any): Promise<T> {
@@ -122,9 +120,6 @@ export class VendureAdapter implements TargetAdapter {
           const existingAssetId = this.assetMappingService.getVendureAssetId(file.id);
 
           if (existingAssetId) {
-            this.logger.debug(
-              `Using existing asset ${file.id} -> ${existingAssetId}, skipping upload`,
-            );
             assetIds.push(existingAssetId);
           } else if (file.buffer && file.name) {
             // Upload new asset and add to mapping
@@ -137,7 +132,6 @@ export class VendureAdapter implements TargetAdapter {
 
     let productId: string;
     if (existingProduct) {
-      this.logger.debug(`Updating existing product ${product.sku} (ID: ${existingProduct.id})`);
       const updateInput = this.mapper.mapToUpdateProductInput(
         existingProduct.id,
         product,
@@ -145,21 +139,20 @@ export class VendureAdapter implements TargetAdapter {
       );
       await this.requestWithRetry(UPDATE_PRODUCT, { input: updateInput });
       productId = existingProduct.id;
+      this.logger.info(`Updated product ${product.sku} (ID: ${productId})`);
     } else {
-      this.logger.debug(`Creating new product ${product.sku}`);
       const createInput = this.mapper.mapToCreateProductInput(product, assetIds);
 
       const resp = await this.requestWithRetry<{ createProduct: { id: string } }>(CREATE_PRODUCT, {
         input: createInput,
       });
       productId = resp.createProduct.id;
+      this.logger.info(`Created product ${product.sku} (ID: ${productId})`);
     }
 
     // Handle Option Groups first (required for variants)
     if (product.optionGroups && product.optionGroups.length > 0) {
-      const { optionGroupMap, optionIdMap } = await this.ensureOptionGroupsExist(
-        product.optionGroups,
-      );
+      const { optionGroupMap } = await this.ensureOptionGroupsExist(product.optionGroups);
       await this.addOptionGroupsToProduct(productId, Array.from(optionGroupMap.values()));
     }
 
@@ -168,21 +161,11 @@ export class VendureAdapter implements TargetAdapter {
 
     // Auto-create default variant for simple products (products without variants)
     if (!variantsToUpsert || variantsToUpsert.length === 0) {
-      this.logger.debug(
-        `Product ${product.sku} has no variants, checking for existing variants in Vendure`,
-      );
       const existingVariants = await this.getExistingVariants(productId);
 
       if (existingVariants.length === 0) {
-        this.logger.debug(
-          `No existing variants found, creating default variant for product ${product.sku}`,
-        );
         const defaultVariant = this.createDefaultVariant(product);
         variantsToUpsert = [defaultVariant];
-      } else {
-        this.logger.debug(
-          `Found ${existingVariants.length} existing variants, skipping default variant creation`,
-        );
       }
     }
 
@@ -337,13 +320,9 @@ export class VendureAdapter implements TargetAdapter {
       }
     }
     if (toUpdate.length > 0) {
-      const resp = await this.requestWithRetry<UpdateProductVariantsResponse>(
-        UPDATE_PRODUCT_VARIANTS,
-        {
-          input: toUpdate,
-        },
-      );
-      console.log(resp);
+      await this.requestWithRetry<UpdateProductVariantsResponse>(UPDATE_PRODUCT_VARIANTS, {
+        input: toUpdate,
+      });
     }
   }
 
@@ -376,20 +355,12 @@ export class VendureAdapter implements TargetAdapter {
         ],
       };
 
-      const res = await this.requestWithRetry(UPDATE_COLLECTION, {
+      const res = await this.requestWithRetry<any>(UPDATE_COLLECTION, {
         input: updateInput,
       });
 
-      // @ts-ignore
       updatedCollections.push(res.updateCollection.id);
     }
-
-    console.log(updatedCollections);
-  }
-
-  async upsertAsset(asset: Asset): Promise<void> {
-    this.logger.debug(`Upserting asset ${asset.url} to Vendure... (Not fully implemented)`);
-    // TODO: Implement asset upload via Admin API
   }
 
   async upsertCollection(
@@ -407,7 +378,7 @@ export class VendureAdapter implements TargetAdapter {
       return targetId;
     }
 
-    // Use the provided parentCollectionIdMap, or fall back to global map
+    // Use the provided parentCollectionIdMap or fall back to global map
     const mapToUse = parentCollectionIdMap ?? VendureCollectionService.getGlobalCollectionIdMap();
     return this.collectionService.upsertCollection(category, mapToUse);
   }
@@ -482,9 +453,6 @@ export class VendureAdapter implements TargetAdapter {
         const resp = await this.requestWithRetry<{
           createProductOption: { id: string; code: string };
         }>(CREATE_PRODUCT_OPTION, { input });
-        this.logger.debug(
-          `Created option ${option.code} for group ${groupId} (ID: ${resp.createProductOption.id}, Vendure code: ${resp.createProductOption.code})`,
-        );
 
         // Map Akeneo option code to Vendure option ID
         optionIdMap.set(option.code, resp.createProductOption.id);
@@ -519,7 +487,6 @@ export class VendureAdapter implements TargetAdapter {
           if (createdGroupId) {
             groupId = createdGroupId;
             VendureAdapter.globalOptionGroupMap.set(optionGroup.code, groupId);
-            this.logger.debug(`Created option group: ${optionGroup.code} (ID: ${groupId})`);
 
             // Create options for this group and track the mapping
             if (optionGroup.values && optionGroup.values.length > 0) {
@@ -567,9 +534,6 @@ export class VendureAdapter implements TargetAdapter {
 
       for (const optionGroupId of optionGroupIds) {
         if (existingGroupIds.has(optionGroupId)) {
-          this.logger.debug(
-            `Option group ${optionGroupId} already assigned to product ${productId}, skipping`,
-          );
           continue;
         }
 
@@ -578,7 +542,6 @@ export class VendureAdapter implements TargetAdapter {
             productId,
             optionGroupId,
           });
-          this.logger.debug(`Added option group ${optionGroupId} to product ${productId}`);
         } catch (error) {
           this.logger.error(
             `Failed to add option group ${optionGroupId} to product ${productId}:`,
@@ -595,7 +558,6 @@ export class VendureAdapter implements TargetAdapter {
             productId,
             optionGroupId,
           });
-          this.logger.debug(`Added option group ${optionGroupId} to product ${productId}`);
         } catch (error) {
           this.logger.error(
             `Failed to add option group ${optionGroupId} to product ${productId}:`,

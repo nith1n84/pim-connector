@@ -1,4 +1,4 @@
-import { Asset, Category, Product } from "./cdm.types.js";
+import { Category, Product } from "./cdm.types.js";
 
 export interface SourceAdapter {
   name: string;
@@ -14,7 +14,6 @@ export interface TargetAdapter {
   name: string;
   initialize(): Promise<void>;
   upsertProduct(product: Product, targetId?: string): Promise<string>;
-  upsertAsset(asset: Asset): Promise<void>;
   upsertCollection(
     category: Category,
     targetId?: string,

@@ -11,9 +11,9 @@ import { VendureAdapter } from "@pim-connector/adapter-vendure";
 
 // Function to substitute environment variables in configuration
 function substituteEnvVars(obj: any): any {
-  if (typeof obj === 'string') {
+  if (typeof obj === "string") {
     // Replace ${VAR_NAME} with process.env.VAR_NAME
-    return obj.replace(/\$\{([^}]+)\}/g, (match, varName) => {
+    return obj.replace(/\$\{([^}]+)}/g, (_match, varName) => {
       const envValue = process.env[varName];
       if (envValue === undefined) {
         throw new Error(`Environment variable ${varName} is not set but required in configuration`);
@@ -22,7 +22,7 @@ function substituteEnvVars(obj: any): any {
     });
   } else if (Array.isArray(obj)) {
     return obj.map(substituteEnvVars);
-  } else if (obj !== null && typeof obj === 'object') {
+  } else if (obj !== null && typeof obj === "object") {
     const result: any = {};
     for (const [key, value] of Object.entries(obj)) {
       result[key] = substituteEnvVars(value);
@@ -42,7 +42,7 @@ async function main() {
     allowPositionals: true,
   });
 
-  const logger = new BasicLogger("CLI");
+  const logger = new BasicLogger("CLI", process.env.LOG_LEVEL);
   let config: any;
 
   if (
@@ -94,11 +94,11 @@ Options:
   let configPath: string;
   try {
     const projectRoot = await findProjectRoot(process.cwd());
-    
+
     // Load .env file from project root
     const envPath = join(projectRoot, ".env");
     dotenvConfig({ path: envPath });
-    
+
     configPath = join(projectRoot, "connector.config.json");
     const configData = await readFile(configPath, "utf-8");
     const rawConfig = JSON.parse(configData);
