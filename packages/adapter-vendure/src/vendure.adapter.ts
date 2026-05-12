@@ -29,12 +29,14 @@ import {
 } from "./types/vendure.types.js";
 import { VendureMapper } from "./mappers/vendure.mapper.js";
 import { VendureCollectionService } from "./services/vendure-collection.service.js";
+import { AssetMappingService } from "./services/asset-mapping.service.js";
 
 export class VendureAdapter implements TargetAdapter {
   readonly name = "vendure";
   private client: GraphQLClient;
   private mapper: VendureMapper;
   private collectionService: VendureCollectionService;
+  private assetMappingService: AssetMappingService;
   private static globalOptionIdMap: Map<string, string> = new Map(); // Shared across all products
   private static globalOptionGroupMap: Map<string, string> = new Map(); // Shared across all products
   private categoryIdentityMap: IdentityMap;
@@ -48,6 +50,7 @@ export class VendureAdapter implements TargetAdapter {
     }
     this.mapper = new VendureMapper(config);
     this.collectionService = new VendureCollectionService(this.client, this.mapper, this.logger);
+    this.assetMappingService = new AssetMappingService();
     this.categoryIdentityMap = config.categoryIdentityMap;
   }
 
@@ -58,6 +61,8 @@ export class VendureAdapter implements TargetAdapter {
   }
 
   async initialize(): Promise<void> {
+    await this.assetMappingService.loadMapping();
+
     if (this.config.email && this.config.password) {
       this.logger.debug("Authenticating with Vendure...");
       try {
@@ -112,9 +117,20 @@ export class VendureAdapter implements TargetAdapter {
     const assetIds: string[] = [];
     if (assetFiles && assetFiles?.length > 0) {
       for (const file of assetFiles) {
-        if (file.buffer && file.name) {
-          const result = await this.upload(file.buffer, file.name, file.mimeType);
-          assetIds.push(...result);
+        if (file.id && file.name) {
+          // Check if asset already exists in mapping
+          const existingAssetId = this.assetMappingService.getVendureAssetId(file.id);
+
+          if (existingAssetId) {
+            this.logger.debug(
+              `Using existing asset ${file.id} -> ${existingAssetId}, skipping upload`,
+            );
+            assetIds.push(existingAssetId);
+          } else if (file.buffer && file.name) {
+            // Upload new asset and add to mapping
+            const result = await this.upload(file.buffer, file.name, file.mimeType, file.id);
+            assetIds.push(...result);
+          }
         }
       }
     }
@@ -636,6 +652,7 @@ export class VendureAdapter implements TargetAdapter {
     buffer: Buffer,
     filename: string,
     mimeType = "image/png",
+    sourceId?: string,
   ): Promise<string[]> {
     const form = new FormData();
 
@@ -690,7 +707,13 @@ export class VendureAdapter implements TargetAdapter {
     }
 
     const assets = json.data?.createAssets ?? [];
+    const assetIds = assets.map((asset: any) => asset.id);
 
-    return assets.map((asset: any) => asset.id);
+    // Add to mapping if sourceId is provided
+    if (sourceId && assetIds.length > 0) {
+      await this.assetMappingService.addMapping(sourceId, assetIds[0]);
+    }
+
+    return assetIds;
   }
 }

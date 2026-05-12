@@ -26,6 +26,7 @@ export class AkeneoAssetService {
     buffer: Buffer;
     filename: string;
     mimeType: string;
+    code: string;
   } | null> {
     const fileInfo = await this.getProductMediaFile(code);
 
@@ -39,6 +40,7 @@ export class AkeneoAssetService {
       // If response is already a buffer (from axios with responseType: 'arraybuffer')
       if (Buffer.isBuffer(response)) {
         return {
+          code: code,
           buffer: response,
           filename: fileInfo.original_filename, // Default extension, could be improved
           mimeType: fileInfo.mime_type, // Default MIME type
@@ -61,6 +63,7 @@ export class AkeneoAssetService {
       }
 
       return {
+        code,
         buffer,
         filename,
         mimeType,

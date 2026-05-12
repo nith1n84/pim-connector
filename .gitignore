@@ -9,6 +9,7 @@ dist/
 connector.config.json
 identities.json
 category.json
+asset-mapping.json
 
 # IDEs
 .vscode/
