@@ -1,5 +1,6 @@
 import axios, { AxiosInstance, AxiosRequestConfig } from "axios";
 import {
+  AkeneoAssetFamily,
   AkeneoAttribute,
   AkeneoAttributeOption,
   AkeneoCategory,
@@ -26,6 +27,7 @@ export class AkeneoClient {
   // Cache for reducing redundant API calls
   private productModelCache: Map<string, AkeneoProductModel | null> = new Map();
   private familyVariantCache: Map<string, AkeneoFamilyVariant | null> = new Map();
+  private assetFamilyCache: Map<string, any> = new Map();
 
   constructor(
     private config: AkeneoConfig,
@@ -350,6 +352,7 @@ export class AkeneoClient {
   clearCaches(): void {
     this.productModelCache.clear();
     this.familyVariantCache.clear();
+    this.assetFamilyCache.clear();
   }
 
   /**
@@ -362,5 +365,45 @@ export class AkeneoClient {
       categories.push(...items);
     }
     return categories;
+  }
+
+  async getAssetFamily(assetFamilyCode: string): Promise<AkeneoAssetFamily | null> {
+    if (this.assetFamilyCache.has(assetFamilyCode)) {
+      return this.assetFamilyCache.get(assetFamilyCode)!;
+    }
+
+    try {
+      const assetFamily = await this.request<AkeneoAssetFamily>({
+        url: `/api/rest/v1/asset-families/${assetFamilyCode}`,
+        method: "GET",
+      });
+      this.assetFamilyCache.set(assetFamilyCode, assetFamily);
+      return assetFamily;
+    } catch (error) {
+      this.assetFamilyCache.set(assetFamilyCode, null);
+      return null;
+    }
+  }
+
+  async getAssetsFromAssetFamily(assetFamilyCode: string, assetCodes: string[]) {
+    const searchFilter = assetCodes
+      ? {
+          code: [
+            {
+              operator: "IN" as const,
+              value: assetCodes,
+            },
+          ],
+        }
+      : {};
+
+    const assets: any[] = [];
+    const iterator = this.paginate<any>(`/api/rest/v1/asset-families/${assetFamilyCode}/assets`, {
+      search: JSON.stringify(searchFilter),
+    });
+    for await (const items of iterator) {
+      assets.push(...items);
+    }
+    return assets;
   }
 }

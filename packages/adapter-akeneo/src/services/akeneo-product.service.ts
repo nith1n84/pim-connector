@@ -1,4 +1,4 @@
-import { AttributeDefinition, Logger, OptionGroup, Page, Product } from "@pim-connector/core";
+import { Logger, OptionGroup, Page, Product } from "@pim-connector/core";
 import { AkeneoClient } from "../client/akeneo.client.js";
 import { AkeneoMapper } from "../mappers/akeneo.mapper.js";
 import { AkeneoProduct, AkeneoProductModel } from "../types/akeneo.types.js";
@@ -9,7 +9,6 @@ import { AkeneoAssetService } from "./akeneo-asset.service.js";
  * Orchestrates fetching, variant resolution, and mapping to CDM.
  */
 export class AkeneoProductService {
-  private attributeDefinitions: Map<string, AttributeDefinition> = new Map();
   private familyMappings: Map<string, { labelAttribute: string; imageAttribute: string | null }> =
     new Map();
   private akeneoAssetService: AkeneoAssetService;
@@ -122,6 +121,20 @@ export class AkeneoProductService {
                 if (file) {
                   mediaFiles.push(file);
                 }
+              } else if (
+                media &&
+                media.attribute_type === "pim_catalog_asset_collection" &&
+                Array.isArray(media.data) &&
+                media.reference_data_name
+              ) {
+                const data: string[] = media.data;
+                const refDataName = media.reference_data_name;
+                const assets = await this.akeneoAssetService.downloadAssetMediaFile(
+                  refDataName,
+                  data,
+                );
+
+                mediaFiles.push(...assets);
               }
             }
           }

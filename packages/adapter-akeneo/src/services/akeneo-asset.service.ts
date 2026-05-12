@@ -1,5 +1,6 @@
 import { Logger } from "@pim-connector/core";
 import { AkeneoClient } from "../client/akeneo.client.js";
+import axios from "axios";
 
 /**
  * Service for handling Akeneo assets.
@@ -12,11 +13,10 @@ export class AkeneoAssetService {
 
   async getProductMediaFile(productUuid: string) {
     try {
-      const media = await this.client.request<any>({
+      return await this.client.request<any>({
         url: `/api/rest/v1/media-files/${productUuid}`,
         method: "GET",
       });
-      return media;
     } catch (error) {
       return null;
     }
@@ -42,8 +42,8 @@ export class AkeneoAssetService {
         return {
           code: code,
           buffer: response,
-          filename: fileInfo.original_filename, // Default extension, could be improved
-          mimeType: fileInfo.mime_type, // Default MIME type
+          filename: fileInfo.original_filename,
+          mimeType: fileInfo.mime_type,
         };
       }
 
@@ -74,17 +74,58 @@ export class AkeneoAssetService {
     }
   }
 
-  /**
-   * Downloads product media file and converts to base64 data URL for assetFiles
-   */
-  async downloadProductMediaFileAsBase64(code: string): Promise<string | null> {
-    const result = await this.downloadProductMediaFile(code);
-    if (!result) {
-      return null;
+  async downloadAssetMediaFile(assetFamilyCode: string, assetCodes: string[]): Promise<any[]> {
+    const assets = [];
+
+    const assetFamily = await this.client.getAssetFamily(assetFamilyCode);
+    if (!assetFamily) {
+      this.logger.warn(`Asset family ${assetFamilyCode} not found in Akeneo`);
+      return [];
     }
 
-    const { buffer, mimeType } = result;
-    const base64 = buffer.toString("base64");
-    return `data:${mimeType};base64,${base64}`;
+    const assetInfo = await this.client.getAssetsFromAssetFamily(assetFamilyCode, assetCodes);
+
+    if (assetInfo.length === 0) return [];
+    for (const asset of assetInfo) {
+      const mainAsset = asset?.values?.[assetFamily.attribute_as_main_media]?.[0]; // <== todo: select main media attribute with locale and scope.
+      const mainAssetCode = mainAsset.data;
+      const mainAssetData = mainAsset?.linked_data;
+
+      try {
+        if (mainAssetData?.full_url) {
+          const response = await axios.get<ArrayBuffer>(mainAssetData?.full_url, {
+            responseType: "arraybuffer",
+          });
+          const buffer = Buffer.from(response.data);
+          const mimeType = response.headers["content-type"] || "application/octet-stream";
+
+          assets.push({
+            code: mainAssetCode,
+            buffer,
+            filename: mainAssetCode.trim().split("/").pop() || "asset",
+            mimeType,
+          });
+        } else {
+          const response = await this.client.request<any>({
+            url: `/api/rest/v1/asset-media-files/${mainAssetCode}`,
+            method: "GET",
+            responseType: "arraybuffer",
+          });
+
+          if (Buffer.isBuffer(response)) {
+            assets.push({
+              code: mainAssetCode,
+              buffer: response,
+              filename: mainAssetData.original_filename,
+              mimeType: mainAssetData.mime_type,
+            });
+          }
+        }
+      } catch (e) {
+        this.logger.error(`Failed to download media file ${asset.code}:`, e);
+      }
+    }
+
+    return assets;
   }
 }

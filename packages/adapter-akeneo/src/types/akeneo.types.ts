@@ -111,3 +111,9 @@ export interface AkeneoCategory {
   labels: Record<string, string>;
   updated: string;
 }
+
+export interface AkeneoAssetFamily {
+  code: string;
+  labels: Record<string, string>;
+  attribute_as_main_media: string;
+}
