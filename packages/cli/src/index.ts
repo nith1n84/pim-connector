@@ -41,22 +41,41 @@ Options:
   const command = positionals[0];
   logger.info(`Starting PIM Connector... ${values["dry-run"] ? "(DRY RUN)" : ""}`);
 
-  // Load configuration - handle running from root or packages/cli
-  let configPath = join(process.cwd(), "connector.config.json");
+  // Find project root by looking for package.json and connector.config.json
+  async function findProjectRoot(startPath: string): Promise<string> {
+    let currentPath = startPath;
 
-  // If not found in current dir, check one level up (common for pnpm workspaces)
+    while (currentPath !== dirname(currentPath)) {
+      const packageJsonPath = join(currentPath, "package.json");
+      const configPath = join(currentPath, "connector.config.json");
+
+      try {
+        // Check if both package.json and connector.config.json exist
+        await readFile(packageJsonPath, "utf-8");
+        await readFile(configPath, "utf-8");
+        return currentPath;
+      } catch {
+        // Continue searching up the directory tree
+        currentPath = dirname(currentPath);
+      }
+    }
+
+    throw new Error("Could not find project root with package.json and connector.config.json");
+  }
+
+  // Load configuration from project root
+  let configPath: string;
   try {
+    const projectRoot = await findProjectRoot(process.cwd());
+    configPath = join(projectRoot, "connector.config.json");
     const configData = await readFile(configPath, "utf-8");
     config = JSON.parse(configData);
-  } catch (err) {
-    configPath = join(process.cwd(), "../../connector.config.json");
-    try {
-      const configData = await readFile(configPath, "utf-8");
-      config = JSON.parse(configData);
-    } catch (error) {
-      logger.error(`Could not find connector.config.json in current or parent directories.`);
-      process.exit(1);
-    }
+    logger.info(`Found configuration at: ${configPath}`);
+  } catch (error) {
+    logger.error(
+      `Could not find connector.config.json. Please ensure you're running the command from within the project directory.`,
+    );
+    process.exit(1);
   }
 
   // Validate configuration
@@ -94,6 +113,7 @@ Options:
     delayMs: config.syncOptions?.delayMs,
     dryRun: !!values["dry-run"],
     batchSize: config.syncOptions?.batchSize,
+    concurrency: config.syncOptions?.concurrency,
   });
 
   if (command === "sync-categories") {

@@ -5,6 +5,7 @@ export interface SyncOptions {
   delayMs?: number;
   dryRun?: boolean;
   batchSize?: number;
+  concurrency?: number;
 }
 
 export class SyncEngine {
@@ -16,6 +17,43 @@ export class SyncEngine {
     private logger: Logger,
     private options: SyncOptions = {},
   ) {}
+
+  /**
+   * Processes items in parallel with concurrency control.
+   */
+  private async processInParallel<T, R>(
+    items: T[],
+    processor: (item: T) => Promise<R>,
+    concurrency: number = 5,
+  ): Promise<R[]> {
+    const results: R[] = new Array(items.length);
+    const executing: Array<{ promise: Promise<{ index: number; result: R }>; index: number }> = [];
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const promise = processor(item).then((result) => ({ index: i, result }));
+
+      executing.push({ promise, index: i });
+
+      if (executing.length >= concurrency) {
+        const completed = await Promise.race(executing.map((e) => e.promise));
+        results[completed.index] = completed.result;
+        // Remove completed promise
+        const completedIndex = executing.findIndex((e) => e.index === completed.index);
+        if (completedIndex > -1) {
+          executing.splice(completedIndex, 1);
+        }
+      }
+    }
+
+    // Wait for remaining promises
+    const remainingResults = await Promise.all(executing.map((e) => e.promise));
+    for (const { index, result } of remainingResults) {
+      results[index] = result;
+    }
+
+    return results;
+  }
 
   /**
    * Runs a full synchronization from source to target.
@@ -134,11 +172,23 @@ export class SyncEngine {
    * Processes a list of source categories through transformation and target upsert.
    */
   private async syncCategories(sourceCategories: any[]): Promise<void> {
+    if (sourceCategories.length === 0) return;
+
+    const concurrency = this.options.concurrency || 5;
+    this.logger.info(
+      `Processing ${sourceCategories.length} categories with concurrency: ${concurrency}`,
+    );
+
     let successCount = 0;
     let errorCount = 0;
     const parentCollectionIdMap = new Map<string, string>();
 
-    for (const sourceCategory of sourceCategories) {
+    // Sort categories to ensure parent categories are processed first
+    const sortedCategories = this.sortCategoriesByHierarchy(sourceCategories);
+
+    const processCategory = async (
+      sourceCategory: any,
+    ): Promise<{ success: boolean; error?: Error; targetId?: string }> => {
       try {
         // Check local identity map
         const sourceId = sourceCategory.id || sourceCategory.code;
@@ -160,18 +210,25 @@ export class SyncEngine {
           // Track in identity map
           this.categoryIdentityMap.setMapping(sourceId, newTargetId);
           parentCollectionIdMap.set(sourceCategory.code, newTargetId);
-          successCount++;
+          return { success: true, targetId: newTargetId };
         } else {
           this.logger.info(`[DRY-RUN] Skipped sync for ${sourceCategory.code}`);
-          successCount++;
-        }
-
-        // Apply throttle delay if configured
-        if (this.options.delayMs) {
-          await new Promise((resolve) => setTimeout(resolve, this.options.delayMs));
+          return { success: true };
         }
       } catch (error) {
         this.logger.error(`Failed to sync category ${sourceCategory.code}:`, error);
+        return { success: false, error: error as Error };
+      }
+    };
+
+    // Process categories in parallel with concurrency control
+    const results = await this.processInParallel(sortedCategories, processCategory, concurrency);
+
+    // Count results
+    for (const result of results) {
+      if (result.success) {
+        successCount++;
+      } else {
         errorCount++;
       }
     }
@@ -183,14 +240,53 @@ export class SyncEngine {
   }
 
   /**
+   * Sort categories to ensure parent categories are processed before children.
+   */
+  private sortCategoriesByHierarchy(categories: any[]): any[] {
+    const categoryMap = new Map(categories.map((cat) => [cat.code || cat.id, cat]));
+    const sorted: any[] = [];
+    const visited = new Set<string>();
+
+    const visit = (category: any) => {
+      const code = category.code || category.id;
+      if (visited.has(code)) return;
+
+      // Visit parent first
+      if (category.parentId) {
+        const parent = categoryMap.get(category.parentId);
+        if (parent) {
+          visit(parent);
+        }
+      }
+
+      visited.add(code);
+      sorted.push(category);
+    };
+
+    for (const category of categories) {
+      visit(category);
+    }
+
+    return sorted;
+  }
+
+  /**
    * Processes a list of source products through transformation and target upsert.
    */
   private async syncProducts(sourceProducts: any[]): Promise<void> {
     if (sourceProducts.length === 0) return;
+
+    const concurrency = this.options.concurrency || 5;
+    this.logger.info(
+      `Processing ${sourceProducts.length} products with concurrency: ${concurrency}`,
+    );
+
     let successCount = 0;
     let errorCount = 0;
 
-    for (const sourceProduct of sourceProducts) {
+    const processProduct = async (
+      sourceProduct: any,
+    ): Promise<{ success: boolean; error?: Error }> => {
       try {
         // 1. Check local identity map
         const sourceId = sourceProduct.id || sourceProduct.sku;
@@ -207,18 +303,25 @@ export class SyncEngine {
 
           // Track in identity map
           this.identityMap.setMapping(sourceId, newTargetId);
-          successCount++;
+          return { success: true };
         } else {
           this.logger.info(`[DRY-RUN] Skipped sync for ${sourceProduct.sku}`);
-          successCount++;
-        }
-
-        // Apply throttle delay if configured
-        if (this.options.delayMs) {
-          await new Promise((resolve) => setTimeout(resolve, this.options.delayMs));
+          return { success: true };
         }
       } catch (error) {
         this.logger.error(`Failed to sync product ${sourceProduct.id || "unknown"}:`, error);
+        return { success: false, error: error as Error };
+      }
+    };
+
+    // Process products in parallel with concurrency control
+    const results = await this.processInParallel(sourceProducts, processProduct, concurrency);
+
+    // Count results
+    for (const result of results) {
+      if (result.success) {
+        successCount++;
+      } else {
         errorCount++;
       }
     }

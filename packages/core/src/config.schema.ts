@@ -51,6 +51,8 @@ export const SyncOptionsSchema = z.object({
   delayMs: z.number().min(0).optional(),
   retries: z.number().min(0).optional(),
   retryDelayMs: z.number().min(0).optional(),
+  batchSize: z.number().min(1).optional(),
+  concurrency: z.number().min(1).optional(),
 });
 
 export const ConnectorConfigSchema = z.object({
