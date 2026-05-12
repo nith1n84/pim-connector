@@ -1,9 +1,36 @@
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { parseArgs } from "node:util";
+import { config as dotenvConfig } from "dotenv";
 import { BasicLogger, IdentityMap, SyncEngine, validateConfig } from "@pim-connector/core";
 import { AkeneoAdapter } from "@pim-connector/adapter-akeneo";
 import { VendureAdapter } from "@pim-connector/adapter-vendure";
+
+// Load environment variables from .env file
+// We'll load it later after finding the project root
+
+// Function to substitute environment variables in configuration
+function substituteEnvVars(obj: any): any {
+  if (typeof obj === 'string') {
+    // Replace ${VAR_NAME} with process.env.VAR_NAME
+    return obj.replace(/\$\{([^}]+)\}/g, (match, varName) => {
+      const envValue = process.env[varName];
+      if (envValue === undefined) {
+        throw new Error(`Environment variable ${varName} is not set but required in configuration`);
+      }
+      return envValue;
+    });
+  } else if (Array.isArray(obj)) {
+    return obj.map(substituteEnvVars);
+  } else if (obj !== null && typeof obj === 'object') {
+    const result: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      result[key] = substituteEnvVars(value);
+    }
+    return result;
+  }
+  return obj;
+}
 
 async function main() {
   const { values, positionals } = parseArgs({
@@ -67,13 +94,19 @@ Options:
   let configPath: string;
   try {
     const projectRoot = await findProjectRoot(process.cwd());
+    
+    // Load .env file from project root
+    const envPath = join(projectRoot, ".env");
+    dotenvConfig({ path: envPath });
+    
     configPath = join(projectRoot, "connector.config.json");
     const configData = await readFile(configPath, "utf-8");
-    config = JSON.parse(configData);
+    const rawConfig = JSON.parse(configData);
+    config = substituteEnvVars(rawConfig);
     logger.info(`Found configuration at: ${configPath}`);
-  } catch (error) {
+  } catch (error: any) {
     logger.error(
-      `Could not find connector.config.json. Please ensure you're running the command from within the project directory.`,
+      `Could not find connector.config.json. Please ensure you're running the command from within the project directory. Error: ${error.message}`,
     );
     process.exit(1);
   }

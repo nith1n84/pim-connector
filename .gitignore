@@ -6,10 +6,10 @@ dist/
 *.tsbuildinfo
 
 # Configuration & Secrets
-connector.config.json
 identities.json
 category.json
 asset-mapping.json
+.env
 
 # IDEs
 .vscode/

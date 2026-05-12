@@ -1,0 +1,45 @@
+{
+  "source": {
+    "adapter": "akeneo",
+    "config": {
+      "url": "${AKENEO_URL}",
+      "clientId": "${AKENEO_CLIENT_ID}",
+      "secret": "${AKENEO_SECRET}",
+      "username": "${AKENEO_USERNAME}",
+      "password": "${AKENEO_PASSWORD}",
+      "locales": ["en_GB", "ar_KW"],
+      "scopes": ["ecommerce", "xcite"]
+    }
+  },
+  "target": {
+    "adapter": "vendure",
+    "config": {
+      "url": "${VENDURE_URL}",
+      "email": "${VENDURE_EMAIL}",
+      "password": "${VENDURE_PASSWORD}",
+      "localeMap": {
+        "en_GB": "en",
+        "ar_KW": "ar"
+      },
+      "channelMap": {
+        "ecommerce": "2",
+        "xcite": "4"
+      }
+    }
+  },
+  "mapping": {
+    "attributeMap": {
+      "sku": "identifier",
+      "name": "values.name",
+      "description": "values.description"
+    },
+    "excludeAttributes": ["sku", "name", "description"]
+  },
+  "syncOptions": {
+    "delayMs": 100,
+    "retries": 3,
+    "retryDelayMs": 300,
+    "batchSize": 20,
+    "concurrency": 20
+  }
+}

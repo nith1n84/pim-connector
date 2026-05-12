@@ -12,6 +12,7 @@
     "@pim-connector/adapter-akeneo": "workspace:*",
     "@pim-connector/adapter-vendure": "workspace:*",
     "@pim-connector/core": "workspace:*",
-    "commander": "^14.0.3"
+    "commander": "^14.0.3",
+    "dotenv": "^16.6.1"
   }
 }
