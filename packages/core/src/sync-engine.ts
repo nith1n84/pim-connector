@@ -168,23 +168,11 @@ export class SyncEngine {
    * Processes a list of source categories through transformation and target upsert.
    */
   private async syncCategories(sourceCategories: any[]): Promise<void> {
-    if (sourceCategories.length === 0) return;
-
-    const concurrency = this.options.concurrency || 5;
-    this.logger.info(
-      `Processing ${sourceCategories.length} categories with concurrency: ${concurrency}`,
-    );
-
     let successCount = 0;
     let errorCount = 0;
     const parentCollectionIdMap = new Map<string, string>();
 
-    // Sort categories to ensure parent categories are processed first
-    const sortedCategories = this.sortCategoriesByHierarchy(sourceCategories);
-
-    const processCategory = async (
-      sourceCategory: any,
-    ): Promise<{ success: boolean; error?: Error; targetId?: string }> => {
+    for (const sourceCategory of sourceCategories) {
       try {
         // Check local identity map
         const sourceId = sourceCategory.id || sourceCategory.code;
@@ -206,25 +194,18 @@ export class SyncEngine {
           // Track in identity map
           this.categoryIdentityMap.setMapping(sourceId, newTargetId);
           parentCollectionIdMap.set(sourceCategory.code, newTargetId);
-          return { success: true, targetId: newTargetId };
+          successCount++;
         } else {
           this.logger.info(`[DRY-RUN] Skipped sync for ${sourceCategory.code}`);
-          return { success: true };
+          successCount++;
+        }
+
+        // Apply throttle delay if configured
+        if (this.options.delayMs) {
+          await new Promise((resolve) => setTimeout(resolve, this.options.delayMs));
         }
       } catch (error) {
         this.logger.error(`Failed to sync category ${sourceCategory.code}:`, error);
-        return { success: false, error: error as Error };
-      }
-    };
-
-    // Process categories in parallel with concurrency control
-    const results = await this.processInParallel(sortedCategories, processCategory, concurrency);
-
-    // Count results
-    for (const result of results) {
-      if (result.success) {
-        successCount++;
-      } else {
         errorCount++;
       }
     }
