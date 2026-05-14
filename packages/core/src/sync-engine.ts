@@ -64,10 +64,13 @@ export class SyncEngine {
       `Starting ${syncType} product sync from ${this.source.name} to ${this.target.name}${since ? ` since ${since.toISOString()}` : ""}`,
     );
 
+    let successCount = 0;
+    let errorCount = 0;
+
     try {
       const batchSize = this.options.batchSize || 10;
       let page = 1;
-      let totalProductsSynced = 0;
+      let totalProductsFetched = 0;
 
       while (true) {
         this.logger.info(`Fetching page ${page} with batch size ${batchSize}`);
@@ -78,9 +81,20 @@ export class SyncEngine {
           break;
         }
 
-        this.logger.info(`Fetched ${sourceProducts.length} products from page ${page}.`);
-        await this.syncProductsInternal(sourceProducts);
-        totalProductsSynced += sourceProducts.length;
+        totalProductsFetched += sourceProducts.length;
+        this.logger.info(
+          `Fetched ${sourceProducts.length} products (Total fetched: ${totalProductsFetched})`,
+        );
+
+        const batchResults = await this.syncProductsInternal(sourceProducts);
+        successCount += batchResults.success;
+        errorCount += batchResults.error;
+
+        if (totalProductsFetched % 50 === 0) {
+          this.logger.info(
+            `Progress: ${totalProductsFetched} products processed (${successCount} succeeded, ${errorCount} failed)`,
+          );
+        }
 
         page++;
       }
@@ -88,9 +102,12 @@ export class SyncEngine {
       // Save identity map persistence
       await this.identityMap.save();
 
-      this.logger.info(
-        `${syncType.charAt(0).toUpperCase() + syncType.slice(1)} sync completed successfully. Total products synced: ${totalProductsSynced}.`,
-      );
+      this.logger.info("--------------------------------------------------");
+      this.logger.info(`${syncType.charAt(0).toUpperCase() + syncType.slice(1)} sync summary:`);
+      this.logger.info(`- Total Products: ${totalProductsFetched}`);
+      this.logger.info(`- Succeeded:      ${successCount}`);
+      this.logger.info(`- Failed:         ${errorCount}`);
+      this.logger.info("--------------------------------------------------");
     } catch (error) {
       this.logger.error(
         `${syncType.charAt(0).toUpperCase() + syncType.slice(1)} sync failed:`,
@@ -116,7 +133,8 @@ export class SyncEngine {
       const sourceCategories = await this.source.getCategories();
       this.logger.info(`Fetched ${sourceCategories.length} categories from source.`);
 
-      await this.syncCategories(sourceCategories);
+      const sortedCategories = this.sortCategoriesByHierarchy(sourceCategories);
+      await this.syncCategories(sortedCategories);
 
       this.logger.info("Category sync completed successfully.");
     } catch (error) {
@@ -141,8 +159,9 @@ export class SyncEngine {
 
         // Log action
         const action = targetId ? "Updating" : "Creating";
+        const displayName = this.getDisplayName(sourceCategory.name) || sourceCategory.code;
         this.logger.info(
-          `${this.options.dryRun ? "[DRY-RUN] " : ""}${action} collection: ${sourceCategory.code} (${sourceCategory.name})`,
+          `${this.options.dryRun ? "[DRY-RUN] " : ""}${action} collection: ${sourceCategory.code} (${displayName})`,
         );
 
         if (!this.options.dryRun) {
@@ -174,7 +193,23 @@ export class SyncEngine {
     // Save identity map persistence
     await this.categoryIdentityMap.save();
 
-    this.logger.info(`Category sync statistics: ${successCount} succeeded, ${errorCount} failed.`);
+    this.logger.info("--------------------------------------------------");
+    this.logger.info("Category sync summary:");
+    this.logger.info(`- Total Categories: ${sourceCategories.length}`);
+    this.logger.info(`- Succeeded:        ${successCount}`);
+    this.logger.info(`- Failed:           ${errorCount}`);
+    this.logger.info("--------------------------------------------------");
+  }
+
+  /**
+   * Helper to get a display name from localized strings.
+   */
+  private getDisplayName(name: any): string | undefined {
+    if (typeof name === "string") return name;
+    if (!name || typeof name !== "object") return undefined;
+
+    // Try common locales
+    return name.en_US || name.en || Object.values(name)[0] as string;
   }
 
   /**
@@ -211,8 +246,10 @@ export class SyncEngine {
   /**
    * Processes a list of source products through transformation and target upsert.
    */
-  private async syncProductsInternal(sourceProducts: any[]): Promise<void> {
-    if (sourceProducts.length === 0) return;
+  private async syncProductsInternal(
+    sourceProducts: any[],
+  ): Promise<{ success: number; error: number }> {
+    if (sourceProducts.length === 0) return { success: 0, error: 0 };
 
     const concurrency = this.options.concurrency || 5;
     this.logger.info(
@@ -264,6 +301,7 @@ export class SyncEngine {
       }
     }
 
-    this.logger.info(`Sync statistics: ${successCount} succeeded, ${errorCount} failed.`);
+    this.logger.info(`Batch results: ${successCount} succeeded, ${errorCount} failed.`);
+    return { success: successCount, error: errorCount };
   }
 }
