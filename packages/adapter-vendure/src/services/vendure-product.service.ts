@@ -47,15 +47,22 @@ export class VendureProductService {
       this.logger.debug(`Updated product ${product.sku} (ID: ${productId})`);
     } else {
       const input = this.mapper.mapToCreateProductInput(product, assetIds);
-      const resp = await this.client.request<{ createProduct: { id: string } }>(CREATE_PRODUCT, { input });
+      const resp = await this.client.request<{ createProduct: { id: string } }>(CREATE_PRODUCT, {
+        input,
+      });
       productId = resp.createProduct.id;
       this.logger.debug(`Created product ${product.sku} (ID: ${productId})`);
     }
 
     // 3. Handle Options
     if (product.optionGroups && product.optionGroups.length > 0) {
-      const { optionGroupMap } = await this.optionService.ensureOptionGroupsExist(product.optionGroups);
-      await this.optionService.addOptionGroupsToProduct(productId, Array.from(optionGroupMap.values()));
+      const { optionGroupMap } = await this.optionService.ensureOptionGroupsExist(
+        product.optionGroups,
+      );
+      await this.optionService.addOptionGroupsToProduct(
+        productId,
+        Array.from(optionGroupMap.values()),
+      );
     }
 
     // 4. Handle Variants
@@ -85,7 +92,11 @@ export class VendureProductService {
     return assetIds;
   }
 
-  private async processVariants(productId: string, product: Product, existingProduct: any): Promise<void> {
+  private async processVariants(
+    productId: string,
+    product: Product,
+    existingProduct: any,
+  ): Promise<void> {
     let variants = product.variants || [];
 
     // Simple product logic
@@ -120,7 +131,9 @@ export class VendureProductService {
 
   private async getProductById(id: string): Promise<VendureProduct | null> {
     try {
-      const resp = await this.client.request<{ product: VendureProduct }>(GET_PRODUCT_BY_ID, { id });
+      const resp = await this.client.request<{ product: VendureProduct }>(GET_PRODUCT_BY_ID, {
+        id,
+      });
       return resp.product || null;
     } catch (error) {
       this.logger.error(`Error finding product by ID ${id}:`, error);

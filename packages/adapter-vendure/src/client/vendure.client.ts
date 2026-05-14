@@ -84,11 +84,7 @@ export class VendureClient {
   /**
    * Uploads a file to Vendure as an asset.
    */
-  async upload(
-    buffer: Buffer,
-    filename: string,
-    mimeType = "image/png",
-  ): Promise<string[]> {
+  async upload(buffer: Buffer, filename: string, mimeType = "image/png"): Promise<string[]> {
     const form = new FormData();
 
     form.append(
@@ -101,10 +97,7 @@ export class VendureClient {
       }),
     );
 
-    form.append(
-      "map",
-      JSON.stringify({ "1": ["variables.input.0.file"] }),
-    );
+    form.append("map", JSON.stringify({ "1": ["variables.input.0.file"] }));
 
     const blob = new Blob([new Uint8Array(buffer)], { type: mimeType });
     form.append("1", blob, filename);
@@ -148,7 +141,13 @@ export class VendureClient {
     }
 
     // 2. Common Network Errors
-    const transientNetworkCodes = ["ECONNRESET", "ETIMEDOUT", "ECONNREFUSED", "EHOSTUNREACH", "ENOTFOUND"];
+    const transientNetworkCodes = [
+      "ECONNRESET",
+      "ETIMEDOUT",
+      "ECONNREFUSED",
+      "EHOSTUNREACH",
+      "ENOTFOUND",
+    ];
     if (transientNetworkCodes.some((code) => message.includes(code.toLowerCase()))) {
       return true;
     }

@@ -1,10 +1,4 @@
-import {
-  BasicLogger,
-  Category,
-  IdentityMap,
-  Product,
-  TargetAdapter,
-} from "@pim-connector/core";
+import { BasicLogger, Category, IdentityMap, Product, TargetAdapter } from "@pim-connector/core";
 import { VendureConfig } from "./types/vendure.types.js";
 import { VendureMapper } from "./mappers/vendure.mapper.js";
 import { VendureClient } from "./client/vendure.client.js";

@@ -19,7 +19,7 @@ export class AkeneoVariantService {
    */
   async getRootProductModel(modelCode: string): Promise<AkeneoProductModel | null> {
     const visited = new Set<string>();
-    
+
     const traverse = async (code: string): Promise<AkeneoProductModel | null> => {
       if (visited.has(code)) return null;
       visited.add(code);

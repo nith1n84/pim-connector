@@ -35,7 +35,7 @@ export class AkeneoOptionService {
 
     this.logger.debug(`Fetching missing option groups from Akeneo: ${missingAxes.join(", ")}`);
     const fetchedOptionGroups = await this.client.getOptionGroups(missingAxes);
-    
+
     // Update mapper cache
     this.mapper.setOptionGroups([...existingOptionGroups, ...fetchedOptionGroups]);
 

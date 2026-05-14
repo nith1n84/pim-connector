@@ -71,7 +71,9 @@ export class AkeneoClient {
    * Refreshes the OAuth2 access token using the password grant flow.
    */
   private async refreshAccessToken(): Promise<string | null> {
-    const authHeader = Buffer.from(`${this.config.clientId}:${this.config.secret}`).toString("base64");
+    const authHeader = Buffer.from(`${this.config.clientId}:${this.config.secret}`).toString(
+      "base64",
+    );
     const params = new URLSearchParams();
     params.append("grant_type", "password");
     params.append("username", this.config.username || "");
@@ -108,7 +110,10 @@ export class AkeneoClient {
           continue;
         }
 
-        this.logger.error("Failed to refresh Akeneo access token:", error.response?.data || error.message);
+        this.logger.error(
+          "Failed to refresh Akeneo access token:",
+          error.response?.data || error.message,
+        );
         return null;
       }
     }
@@ -132,7 +137,9 @@ export class AkeneoClient {
 
         if (remRetries > 0 && isRetryable) {
           const reason = status ? `status ${status}` : `network code ${error.code}`;
-          this.logger.debug(`Akeneo API transient error (${reason}), retrying in ${currentDelay}ms...`);
+          this.logger.debug(
+            `Akeneo API transient error (${reason}), retrying in ${currentDelay}ms...`,
+          );
           await new Promise((resolve) => setTimeout(resolve, currentDelay));
           return attempt(remRetries - 1, currentDelay * 2);
         }
@@ -145,14 +152,29 @@ export class AkeneoClient {
 
   private isRetryableError(error: any): boolean {
     const status = error.response?.status;
-    const transientNetworkCodes = ["ECONNRESET", "ETIMEDOUT", "ECONNREFUSED", "EHOSTUNREACH", "ENOTFOUND"];
-    return (status === 429 || (status >= 500 && status <= 599) || transientNetworkCodes.includes(error.code));
+    const transientNetworkCodes = [
+      "ECONNRESET",
+      "ETIMEDOUT",
+      "ECONNREFUSED",
+      "EHOSTUNREACH",
+      "ENOTFOUND",
+    ];
+    return (
+      status === 429 ||
+      (status >= 500 && status <= 599) ||
+      transientNetworkCodes.includes(error.code)
+    );
   }
 
   /**
    * Fetches a paginated result set from Akeneo.
    */
-  async fetchPage<T>(url: string, page: number = 1, limit: number = 100, params: Record<string, any> = {}): Promise<Page<T>> {
+  async fetchPage<T>(
+    url: string,
+    page: number = 1,
+    limit: number = 100,
+    params: Record<string, any> = {},
+  ): Promise<Page<T>> {
     const response = await this.request<AkeneoPagingResponse<T>>({
       url,
       method: "GET",
@@ -194,7 +216,9 @@ export class AkeneoClient {
   async getFamilies(codes?: string[]): Promise<AkeneoFamily[]> {
     const filter = codes ? { code: [{ operator: "IN" as const, value: codes }] } : {};
     const families: AkeneoFamily[] = [];
-    for await (const items of this.paginate<AkeneoFamily>("/api/rest/v1/families", { search: JSON.stringify(filter) })) {
+    for await (const items of this.paginate<AkeneoFamily>("/api/rest/v1/families", {
+      search: JSON.stringify(filter),
+    })) {
       families.push(...items);
     }
     return families;
@@ -204,7 +228,9 @@ export class AkeneoClient {
    * Fetches products based on pagination and last update date.
    */
   async getProducts(page: number, limit: number, updatedDate?: Date): Promise<Page<AkeneoProduct>> {
-    const search = updatedDate ? { updated: [{ operator: ">" as const, value: formatAkeneoDate(updatedDate) }] } : {};
+    const search = updatedDate
+      ? { updated: [{ operator: ">" as const, value: formatAkeneoDate(updatedDate) }] }
+      : {};
     return this.fetchPage<AkeneoProduct>("/api/rest/v1/products", page, limit, {
       with_count: true,
       search: JSON.stringify(search),
@@ -218,7 +244,10 @@ export class AkeneoClient {
     if (this.productModelCache.has(code)) return this.productModelCache.get(code)!;
 
     try {
-      const model = await this.request<AkeneoProductModel>({ url: `/api/rest/v1/product-models/${code}`, method: "GET" });
+      const model = await this.request<AkeneoProductModel>({
+        url: `/api/rest/v1/product-models/${code}`,
+        method: "GET",
+      });
       this.productModelCache.set(code, model);
       return model;
     } catch (error) {
@@ -235,7 +264,10 @@ export class AkeneoClient {
     if (this.familyVariantCache.has(key)) return this.familyVariantCache.get(key)!;
 
     try {
-      const variant = await this.request<AkeneoFamilyVariant>({ url: `/api/rest/v1/families/${family}/variants/${code}`, method: "GET" });
+      const variant = await this.request<AkeneoFamilyVariant>({
+        url: `/api/rest/v1/families/${family}/variants/${code}`,
+        method: "GET",
+      });
       this.familyVariantCache.set(key, variant);
       return variant;
     } catch (error) {
@@ -251,7 +283,9 @@ export class AkeneoClient {
     const optionGroups: OptionGroup[] = [];
     const filter = { code: [{ operator: "IN" as const, value: attributeCodes }] };
 
-    for await (const attributes of this.paginate<any>("/api/rest/v1/attributes", { search: JSON.stringify(filter) })) {
+    for await (const attributes of this.paginate<any>("/api/rest/v1/attributes", {
+      search: JSON.stringify(filter),
+    })) {
       for (const attribute of attributes) {
         const options = await this.getAttributeOptions(attribute.code);
         if (options.length > 0) {
@@ -259,7 +293,12 @@ export class AkeneoClient {
             id: attribute.code,
             code: attribute.code,
             name: attribute.labels || {},
-            values: options.map(o => ({ id: o.code, code: o.code, name: o.labels || {}, optionGroupId: attribute.code })),
+            values: options.map((o) => ({
+              id: o.code,
+              code: o.code,
+              name: o.labels || {},
+              optionGroupId: attribute.code,
+            })),
           });
         }
       }
@@ -270,7 +309,9 @@ export class AkeneoClient {
   private async getAttributeOptions(attributeCode: string): Promise<AkeneoAttributeOption[]> {
     const options: AkeneoAttributeOption[] = [];
     try {
-      for await (const items of this.paginate<AkeneoAttributeOption>(`/api/rest/v1/attributes/${attributeCode}/options`)) {
+      for await (const items of this.paginate<AkeneoAttributeOption>(
+        `/api/rest/v1/attributes/${attributeCode}/options`,
+      )) {
         options.push(...items);
       }
     } catch (error) {
@@ -296,7 +337,10 @@ export class AkeneoClient {
   async getAssetFamily(code: string): Promise<AkeneoAssetFamily | null> {
     if (this.assetFamilyCache.has(code)) return this.assetFamilyCache.get(code)!;
     try {
-      const family = await this.request<AkeneoAssetFamily>({ url: `/api/rest/v1/asset-families/${code}`, method: "GET" });
+      const family = await this.request<AkeneoAssetFamily>({
+        url: `/api/rest/v1/asset-families/${code}`,
+        method: "GET",
+      });
       this.assetFamilyCache.set(code, family);
       return family;
     } catch (error) {
@@ -311,7 +355,10 @@ export class AkeneoClient {
   async getAssetsFromAssetFamily(familyCode: string, codes: string[]): Promise<any[]> {
     const filter = { code: [{ operator: "IN" as const, value: codes }] };
     const assets: any[] = [];
-    for await (const items of this.paginate<any>(`/api/rest/v1/asset-families/${familyCode}/assets`, { search: JSON.stringify(filter) })) {
+    for await (const items of this.paginate<any>(
+      `/api/rest/v1/asset-families/${familyCode}/assets`,
+      { search: JSON.stringify(filter) },
+    )) {
       assets.push(...items);
     }
     return assets;

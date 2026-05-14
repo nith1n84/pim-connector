@@ -33,7 +33,9 @@ export class VendureOptionService {
     const optionGroupMap = new Map<string, string>();
 
     for (const optionGroup of optionGroups) {
-      let groupId: string | undefined = VendureOptionService.globalOptionGroupMap.get(optionGroup.code);
+      let groupId: string | undefined = VendureOptionService.globalOptionGroupMap.get(
+        optionGroup.code,
+      );
 
       if (!groupId) {
         const existingGroupId = await this.findOptionGroupByCode(optionGroup.code);
@@ -163,7 +165,10 @@ export class VendureOptionService {
     }
   }
 
-  private async populateOptionIdMapFromExistingGroup(groupId: string, optionGroup: any): Promise<void> {
+  private async populateOptionIdMapFromExistingGroup(
+    groupId: string,
+    optionGroup: any,
+  ): Promise<void> {
     const query = `
       query GetProductOptions($groupId: ID!) {
         productOptionGroup(id: $groupId) {

@@ -11,7 +11,8 @@ import { AkeneoVariantService } from "./akeneo-variant.service.js";
  * Orchestrates fetching, variant resolution, and mapping to CDM.
  */
 export class AkeneoProductService {
-  private familyMappings: Map<string, { labelAttribute: string; imageAttribute: string | null }> = new Map();
+  private familyMappings: Map<string, { labelAttribute: string; imageAttribute: string | null }> =
+    new Map();
   private assetService: AkeneoAssetService;
   private optionService: AkeneoOptionService;
   private variantService: AkeneoVariantService;
@@ -44,7 +45,7 @@ export class AkeneoProductService {
     // 2. Process simple products and collect variants
     for (const [familyCode, products] of familyToProducts) {
       const familyMapping = this.familyMappings.get(familyCode)!;
-      
+
       for (const product of products) {
         if (product.parent) {
           variantProducts.push(product);
@@ -79,7 +80,9 @@ export class AkeneoProductService {
       });
 
       await this.ensureFamilyMappingsExist([akeneoProduct.family].filter((f): f is string => !!f));
-      const familyMapping = akeneoProduct.family ? this.familyMappings.get(akeneoProduct.family) : undefined;
+      const familyMapping = akeneoProduct.family
+        ? this.familyMappings.get(akeneoProduct.family)
+        : undefined;
 
       return this.mapper.mapToProduct(akeneoProduct, [], familyMapping);
     } catch (error) {
@@ -99,7 +102,7 @@ export class AkeneoProductService {
   }
 
   private async ensureFamilyMappingsExist(familyCodes: string[]): Promise<void> {
-    const missing = familyCodes.filter(code => !this.familyMappings.has(code));
+    const missing = familyCodes.filter((code) => !this.familyMappings.has(code));
     if (missing.length === 0) return;
 
     const families = await this.client.getFamilies(missing);
@@ -122,23 +125,36 @@ export class AkeneoProductService {
       if (media?.attribute_type === "pim_catalog_image") {
         const file = await this.assetService.downloadProductMediaFile(media.data);
         if (file) mediaFiles.push(file);
-      } else if (media?.attribute_type === "pim_catalog_asset_collection" && Array.isArray(media.data) && media.reference_data_name) {
-        const assets = await this.assetService.downloadAssetMediaFile(media.reference_data_name, media.data);
+      } else if (
+        media?.attribute_type === "pim_catalog_asset_collection" &&
+        Array.isArray(media.data) &&
+        media.reference_data_name
+      ) {
+        const assets = await this.assetService.downloadAssetMediaFile(
+          media.reference_data_name,
+          media.data,
+        );
         mediaFiles.push(...assets);
       }
     }
     return mediaFiles;
   }
 
-  private async processVariantGroup(rootModelCode: string, variants: AkeneoProduct[]): Promise<Product | null> {
+  private async processVariantGroup(
+    rootModelCode: string,
+    variants: AkeneoProduct[],
+  ): Promise<Product | null> {
     const productModel = await this.client.getProductModel(rootModelCode);
     if (!productModel) return null;
 
-    const familyVariant = await this.client.getFamilyVariant(productModel.family, productModel.family_variant);
+    const familyVariant = await this.client.getFamilyVariant(
+      productModel.family,
+      productModel.family_variant,
+    );
     if (!familyVariant) return null;
 
     // Resolve all attribute codes (axes) across all levels of the family variant
-    const axes = familyVariant.variant_attribute_sets.flatMap(set => set.axes);
+    const axes = familyVariant.variant_attribute_sets.flatMap((set) => set.axes);
     const optionGroups = await this.optionService.resolveOptionGroups(axes);
 
     return this.mapper.mapVariantsToProduct(
@@ -146,7 +162,7 @@ export class AkeneoProductService {
       familyVariant,
       variants,
       this.familyMappings.get(productModel.family)!,
-      optionGroups
+      optionGroups,
     );
   }
 }

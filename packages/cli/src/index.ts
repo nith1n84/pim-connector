@@ -1,11 +1,6 @@
 import { parseArgs } from "node:util";
 import { dirname, join } from "node:path";
-import { 
-  BasicLogger, 
-  FileStorageProvider, 
-  MappingManager, 
-  SyncEngine 
-} from "@pim-connector/core";
+import { BasicLogger, FileStorageProvider, MappingManager, SyncEngine } from "@pim-connector/core";
 import { AkeneoAdapter } from "@pim-connector/adapter-akeneo";
 import { VendureAdapter } from "@pim-connector/adapter-vendure";
 import { ConfigLoader } from "./services/config-loader.js";
@@ -26,7 +21,11 @@ async function main() {
   const { values, positionals } = args;
   const logger = new BasicLogger("CLI", process.env.LOG_LEVEL);
 
-  if (values.help || positionals.length === 0 || !["sync", "sync-categories"].includes(positionals[0])) {
+  if (
+    values.help ||
+    positionals.length === 0 ||
+    !["sync", "sync-categories"].includes(positionals[0])
+  ) {
     showHelp();
     return;
   }
