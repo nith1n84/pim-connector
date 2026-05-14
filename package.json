@@ -8,8 +8,8 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
-    "sync": "pnpm run build && pnpm --filter @pim-connector/cli start sync",
-    "category-sync": "pnpm run build && pnpm --filter @pim-connector/cli start sync-categories"
+    "sync": "pnpm --filter @pim-connector/cli start sync",
+    "category-sync": "pnpm --filter @pim-connector/cli start sync-categories"
   },
   "devDependencies": {
     "@types/node": "^25.6.0",
