@@ -1,41 +1,41 @@
-import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { dirname } from "node:path";
+import { StorageProvider } from "./storage/storage.interface.js";
 
 /**
- * Identity map to track IDs across systems with file-based persistence.
+ * Identity map to track IDs across systems.
+ * Uses a StorageProvider for persistence.
  */
 export class IdentityMap {
   private map: Map<string, string> = new Map();
 
-  constructor(private filePath?: string) {}
+  constructor(
+    private readonly provider: StorageProvider,
+    private readonly storageKey: string,
+  ) {}
 
   /**
-   * Loads the mapping from the specified file path.
+   * Loads the mapping from storage.
    */
   async load(): Promise<void> {
-    if (!this.filePath) return;
     try {
-      const data = await readFile(this.filePath, "utf-8");
-      const json = JSON.parse(data);
-      this.map = new Map(Object.entries(json));
-    } catch (error: any) {
-      if (error.code !== "ENOENT") {
-        console.error(`Failed to load identity map from ${this.filePath}:`, error);
+      const data = await this.provider.read(this.storageKey);
+      if (data) {
+        const json = JSON.parse(data);
+        this.map = new Map(Object.entries(json));
       }
+    } catch (error) {
+      console.error(`Failed to load identity map for ${this.storageKey}:`, error);
     }
   }
 
   /**
-   * Saves the current mapping to the specified file path.
+   * Saves the current mapping to storage.
    */
   async save(): Promise<void> {
-    if (!this.filePath) return;
     try {
-      await mkdir(dirname(this.filePath), { recursive: true });
       const json = Object.fromEntries(this.map.entries());
-      await writeFile(this.filePath, JSON.stringify(json, null, 2));
+      await this.provider.write(this.storageKey, JSON.stringify(json, null, 2));
     } catch (error) {
-      console.error(`Failed to save identity map to ${this.filePath}:`, error);
+      console.error(`Failed to save identity map for ${this.storageKey}:`, error);
     }
   }
 

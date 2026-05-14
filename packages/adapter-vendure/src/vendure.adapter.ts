@@ -9,7 +9,6 @@ import { VendureConfig } from "./types/vendure.types.js";
 import { VendureMapper } from "./mappers/vendure.mapper.js";
 import { VendureClient } from "./client/vendure.client.js";
 import { VendureCollectionService } from "./services/vendure-collection.service.js";
-import { AssetMappingService } from "./services/asset-mapping.service.js";
 import { VendureProductService } from "./services/vendure-product.service.js";
 import { VendureOptionService } from "./services/vendure-option.service.js";
 import { VendureVariantService } from "./services/vendure-variant.service.js";
@@ -26,15 +25,15 @@ export class VendureAdapter implements TargetAdapter {
 
   // Services
   private collectionService: VendureCollectionService;
-  private assetMapping: AssetMappingService;
   private productService: VendureProductService;
   private categoryIdentityMap: IdentityMap;
+  private assetIdentityMap: IdentityMap;
 
   constructor(private readonly config: VendureConfig) {
     this.client = new VendureClient(config, this.logger);
     this.mapper = new VendureMapper(config);
-    this.assetMapping = new AssetMappingService();
     this.categoryIdentityMap = config.categoryIdentityMap;
+    this.assetIdentityMap = config.assetIdentityMap;
 
     // Initialize Services
     this.collectionService = new VendureCollectionService(this.client, this.mapper, this.logger);
@@ -50,7 +49,7 @@ export class VendureAdapter implements TargetAdapter {
     this.productService = new VendureProductService(
       this.client,
       this.mapper,
-      this.assetMapping,
+      this.assetIdentityMap,
       optionService,
       variantService,
       this.logger,
@@ -58,10 +57,9 @@ export class VendureAdapter implements TargetAdapter {
   }
 
   /**
-   * Initializes the adapter by loading mappings and authenticating.
+   * Initializes the adapter by authenticating.
    */
   async initialize(): Promise<void> {
-    await this.assetMapping.loadMapping();
     await this.client.authenticate();
     this.logger.info("Vendure Adapter initialized");
   }

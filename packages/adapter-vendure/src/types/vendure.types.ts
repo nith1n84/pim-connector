@@ -14,6 +14,7 @@ export interface VendureConfig {
   excludeAttributes?: string[];
   syncCategories?: boolean;
   categoryIdentityMap: IdentityMap;
+  assetIdentityMap: IdentityMap;
 }
 
 export interface VendureProduct {

@@ -5,3 +5,7 @@ export * from "./logger.js";
 export * from "./transform.pipeline.js";
 export * from "./sync-engine.js";
 export * from "./config.schema.js";
+export * from "./mapping-manager.js";
+export * from "./storage/storage.interface.js";
+export * from "./storage/file-storage.js";
+export * from "./utils/parallel-processor.js";

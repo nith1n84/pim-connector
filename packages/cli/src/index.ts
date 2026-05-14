@@ -1,6 +1,11 @@
 import { parseArgs } from "node:util";
 import { dirname, join } from "node:path";
-import { BasicLogger, IdentityMap, SyncEngine } from "@pim-connector/core";
+import { 
+  BasicLogger, 
+  FileStorageProvider, 
+  MappingManager, 
+  SyncEngine 
+} from "@pim-connector/core";
 import { AkeneoAdapter } from "@pim-connector/adapter-akeneo";
 import { VendureAdapter } from "@pim-connector/adapter-vendure";
 import { ConfigLoader } from "./services/config-loader.js";
@@ -21,11 +26,7 @@ async function main() {
   const { values, positionals } = args;
   const logger = new BasicLogger("CLI", process.env.LOG_LEVEL);
 
-  if (
-    values.help ||
-    positionals.length === 0 ||
-    !["sync", "sync-categories"].includes(positionals[0])
-  ) {
+  if (values.help || positionals.length === 0 || !["sync", "sync-categories"].includes(positionals[0])) {
     showHelp();
     return;
   }
@@ -39,14 +40,17 @@ async function main() {
     const { config, configPath } = await loader.load();
     logger.info(`Configuration loaded from: ${configPath}`);
 
-    // 2. Initialize Identity Maps
+    // 2. Initialize Persistence Layer
     const projectDir = dirname(configPath);
-    const productMap = new IdentityMap(join(projectDir, "identities.json"));
-    const categoryMap = new IdentityMap(join(projectDir, "category.json"));
+    const storageProvider = new FileStorageProvider(projectDir);
+    const mappingManager = new MappingManager(storageProvider, "akeneo", "vendure");
 
-    await Promise.all([productMap.load(), categoryMap.load()]);
+    // 3. Initialize Identity Maps for Entities
+    const productMap = await mappingManager.getIdentityMap("products");
+    const categoryMap = await mappingManager.getIdentityMap("categories");
+    const assetMap = await mappingManager.getIdentityMap("assets");
 
-    // 3. Initialize Adapters
+    // 4. Initialize Adapters
     const source = new AkeneoAdapter(config.source.config);
     const target = new VendureAdapter({
       ...config.target.config,
@@ -55,11 +59,12 @@ async function main() {
       includeAttributes: config.mapping.includeAttributes,
       excludeAttributes: config.mapping.excludeAttributes,
       categoryIdentityMap: categoryMap,
+      assetIdentityMap: assetMap,
     });
 
     await Promise.all([source.initialize(), target.initialize()]);
 
-    // 4. Run Sync Engine
+    // 5. Run Sync Engine
     const engine = new SyncEngine(source, target, productMap, categoryMap, logger, {
       delayMs: config.syncOptions?.delayMs,
       dryRun: !!values["dry-run"],
@@ -72,6 +77,11 @@ async function main() {
     } else {
       const sinceDate = parseSinceDate(values.since);
       await engine.syncProducts(sinceDate);
+    }
+
+    // Save mapping for assets (special case as it's modified within the adapter)
+    if (!values["dry-run"]) {
+      await assetMap.save();
     }
 
     logger.info("Sync operation completed successfully.");

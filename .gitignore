@@ -6,9 +6,7 @@ dist/
 *.tsbuildinfo
 
 # Configuration & Secrets
-identities.json
-category.json
-asset-mapping.json
+.sync-data/
 .env
 
 # IDEs

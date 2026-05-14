@@ -1,7 +1,6 @@
-import { Logger, Product } from "@pim-connector/core";
+import { IdentityMap, Logger, Product } from "@pim-connector/core";
 import { VendureClient } from "../client/vendure.client.js";
 import { VendureMapper } from "../mappers/vendure.mapper.js";
-import { AssetMappingService } from "./asset-mapping.service.js";
 import { VendureOptionService } from "./vendure-option.service.js";
 import { VendureVariantService } from "./vendure-variant.service.js";
 import {
@@ -20,7 +19,7 @@ export class VendureProductService {
   constructor(
     private readonly client: VendureClient,
     private readonly mapper: VendureMapper,
-    private readonly assetMapping: AssetMappingService,
+    private readonly assetIdentityMap: IdentityMap,
     private readonly optionService: VendureOptionService,
     private readonly variantService: VendureVariantService,
     private readonly logger: Logger,
@@ -71,14 +70,14 @@ export class VendureProductService {
 
     for (const file of product.assets) {
       if (file.id && file.name) {
-        const existingAssetId = this.assetMapping.getVendureAssetId(file.id);
+        const existingAssetId = this.assetIdentityMap.getTargetId(file.id);
         if (existingAssetId) {
           assetIds.push(existingAssetId);
         } else if (file.buffer) {
           const result = await this.client.upload(file.buffer, file.name, file.mimeType);
           if (result.length > 0) {
             assetIds.push(result[0]);
-            await this.assetMapping.addMapping(file.id, result[0]);
+            this.assetIdentityMap.setMapping(file.id, result[0]);
           }
         }
       }
