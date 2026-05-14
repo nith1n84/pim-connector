@@ -151,15 +151,16 @@ Options:
 
   if (command === "sync-categories") {
     await engine.runCategorySync();
-  } else if (values.since) {
-    const sinceDate = new Date(values.since);
-    if (isNaN(sinceDate.getTime())) {
-      logger.error(`Invalid date format for --since: ${values.since}`);
-      process.exit(1);
-    }
-    await engine.runIncrementalSync(sinceDate);
   } else {
-    await engine.runFullSync();
+    let sinceDate: Date | undefined;
+    if (values.since) {
+      sinceDate = new Date(values.since);
+      if (isNaN(sinceDate.getTime())) {
+        logger.error(`Invalid date format for --since: ${values.since}`);
+        process.exit(1);
+      }
+    }
+    await engine.syncProducts(sinceDate);
   }
 
   logger.info("Sync operation completed.");

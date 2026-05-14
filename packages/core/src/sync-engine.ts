@@ -56,10 +56,13 @@ export class SyncEngine {
   }
 
   /**
-   * Runs a full synchronization from source to target.
+   * Runs a product synchronization from source to target.
    */
-  async runFullSync(): Promise<void> {
-    this.logger.info(`Starting full sync from ${this.source.name} to ${this.target.name}`);
+  async syncProducts(since?: Date): Promise<void> {
+    const syncType = since ? "incremental" : "full";
+    this.logger.info(
+      `Starting ${syncType} product sync from ${this.source.name} to ${this.target.name}${since ? ` since ${since.toISOString()}` : ""}`,
+    );
 
     try {
       const batchSize = this.options.batchSize || 10;
@@ -68,7 +71,7 @@ export class SyncEngine {
 
       while (true) {
         this.logger.info(`Fetching page ${page} with batch size ${batchSize}`);
-        const sourceProducts = await this.source.fetchProducts(page, batchSize);
+        const sourceProducts = await this.source.fetchProducts(page, batchSize, since);
 
         if (sourceProducts.length === 0) {
           this.logger.info(`No more products found on page ${page}. Stopping sync.`);
@@ -76,7 +79,7 @@ export class SyncEngine {
         }
 
         this.logger.info(`Fetched ${sourceProducts.length} products from page ${page}.`);
-        await this.syncProducts(sourceProducts);
+        await this.syncProductsInternal(sourceProducts);
         totalProductsSynced += sourceProducts.length;
 
         page++;
@@ -86,55 +89,13 @@ export class SyncEngine {
       await this.identityMap.save();
 
       this.logger.info(
-        `Full sync completed successfully. Total products synced: ${totalProductsSynced}.`,
+        `${syncType.charAt(0).toUpperCase() + syncType.slice(1)} sync completed successfully. Total products synced: ${totalProductsSynced}.`,
       );
     } catch (error) {
-      this.logger.error("Full sync failed:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * Runs an incremental synchronization since the specified date.
-   */
-  async runIncrementalSync(since: Date): Promise<void> {
-    this.logger.info(`Starting incremental sync since ${since.toISOString()}`);
-
-    try {
-      if (!this.source.fetchUpdatedProducts) {
-        throw new Error(`Source adapter ${this.source.name} does not support incremental sync.`);
-      }
-
-      const batchSize = this.options.batchSize || 20;
-      let page = 1;
-      let totalProductsSynced = 0;
-
-      while (true) {
-        this.logger.info(`Fetching updated products page ${page} with batch size ${batchSize}`);
-        const updatedProducts = await this.source.fetchUpdatedProducts(page, batchSize, since);
-
-        if (updatedProducts.length === 0) {
-          this.logger.info(
-            `No more updated products found on page ${page}. Stopping incremental sync.`,
-          );
-          break;
-        }
-
-        this.logger.info(`Fetched ${updatedProducts.length} updated products from page ${page}.`);
-        await this.syncProducts(updatedProducts);
-        totalProductsSynced += updatedProducts.length;
-
-        page++;
-      }
-
-      // Save identity map persistence
-      await this.identityMap.save();
-
-      this.logger.info(
-        `Incremental sync completed successfully. Total products synced: ${totalProductsSynced}.`,
+      this.logger.error(
+        `${syncType.charAt(0).toUpperCase() + syncType.slice(1)} sync failed:`,
+        error,
       );
-    } catch (error) {
-      this.logger.error("Incremental sync failed:", error);
       throw error;
     }
   }
@@ -250,7 +211,7 @@ export class SyncEngine {
   /**
    * Processes a list of source products through transformation and target upsert.
    */
-  private async syncProducts(sourceProducts: any[]): Promise<void> {
+  private async syncProductsInternal(sourceProducts: any[]): Promise<void> {
     if (sourceProducts.length === 0) return;
 
     const concurrency = this.options.concurrency || 5;

@@ -34,8 +34,8 @@ export class AkeneoAdapter implements SourceAdapter {
     this.logger.info(`Akeneo Adapter initialized `);
   }
 
-  async fetchProducts(page: number, limit: number, updatedDate?: Date): Promise<Product[]> {
-    return this.productService.fetchProducts(page, limit, updatedDate);
+  async fetchProducts(page: number, limit: number, since?: Date): Promise<Product[]> {
+    return this.productService.fetchProducts(page, limit, since);
   }
 
   /**
@@ -43,13 +43,6 @@ export class AkeneoAdapter implements SourceAdapter {
    */
   async getProduct(id: string): Promise<Product | null> {
     return this.productService.getProduct(id);
-  }
-
-  /**
-   * Fetches products updated since a specific date.
-   */
-  async fetchUpdatedProducts(page: number, limit: number, since?: Date): Promise<Product[]> {
-    return this.productService.fetchProducts(page, limit, since);
   }
 
   /**

@@ -3,9 +3,8 @@ import { Category, Product } from "./cdm.types.js";
 export interface SourceAdapter {
   name: string;
   initialize(): Promise<void>;
-  fetchProducts(page: number, limit: number): Promise<Product[]>;
+  fetchProducts(page: number, limit: number, since?: Date): Promise<Product[]>;
   getProduct(id: string): Promise<any | null>;
-  fetchUpdatedProducts(page: number, limit: number, since: Date): Promise<any[]>;
   getAssets(): Promise<any[]>;
   getCategories(): Promise<Category[]>;
 }
