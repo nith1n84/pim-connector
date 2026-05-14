@@ -1,5 +1,5 @@
-import { GraphQLClient } from "graphql-request";
 import { Category, Logger } from "@pim-connector/core";
+import { VendureClient } from "../client/vendure.client.js";
 import { VendureMapper } from "../mappers/vendure.mapper.js";
 import {
   CREATE_COLLECTION,
@@ -12,17 +12,20 @@ import {
  * Orchestrates collection creation, updates, and parent-child relationships.
  */
 export class VendureCollectionService {
-  private static globalCollectionIdMap: Map<string, string> = new Map(); // Shared across all collections
+  private static globalCollectionIdMap: Map<string, string> = new Map();
 
   constructor(
-    private requester: <T>(query: string, variables?: any) => Promise<T>,
-    private mapper: VendureMapper,
-    private logger: Logger,
+    private readonly client: VendureClient,
+    private readonly mapper: VendureMapper,
+    private readonly logger: Logger,
   ) {}
 
   /**
    * Upserts a collection to Vendure.
    * Checks if a collection exists by slug, then creates or updates accordingly.
+   * @param category - The source category to sync.
+   * @param parentCollectionIdMap - Map of source parent codes to target IDs.
+   * @returns The ID of the upserted collection.
    */
   async upsertCollection(
     category: Category,
@@ -32,41 +35,40 @@ export class VendureCollectionService {
 
     let collectionId: string;
 
+    const parentId = category.parentId
+      ? (parentCollectionIdMap.get(category.parentId) ?? null)
+      : null;
+
     if (existingCollection) {
-      const parentId = category.parentId
-        ? (parentCollectionIdMap.get(category.parentId) ?? null)
-        : null;
       const updateInput = this.mapper.mapToUpdateCollectionInput(
         existingCollection.id,
         category,
         parentId,
       );
-      await this.requester(UPDATE_COLLECTION, { input: updateInput });
+      await this.client.request(UPDATE_COLLECTION, { input: updateInput });
       collectionId = existingCollection.id;
     } else {
-      const parentId = category.parentId
-        ? (parentCollectionIdMap.get(category.parentId) ?? null)
-        : null;
       const createInput = this.mapper.mapToCreateCollectionInput(category, parentId);
 
-      const resp = await this.requester<{ createCollection: { id: string } }>(
+      const resp = await this.client.request<{ createCollection: { id: string } }>(
         CREATE_COLLECTION,
         { input: createInput },
       );
       collectionId = resp.createCollection.id;
     }
 
-    // Store in global map for reference
     VendureCollectionService.globalCollectionIdMap.set(category.code, collectionId);
     return collectionId;
   }
 
   /**
-   * Finds a collection by slug.
+   * Finds a collection by its slug.
+   * @param slug - The slug of the collection.
+   * @returns The collection ID and slug if found, null otherwise.
    */
   private async findCollectionBySlug(slug: string): Promise<{ id: string } | null> {
     try {
-      const resp = await this.requester<{ collections: { items: Array<{ id: string }> } }>(
+      const resp = await this.client.request<{ collections: { items: Array<{ id: string }> } }>(
         GET_COLLECTION_BY_SLUG,
         { slug },
       );
