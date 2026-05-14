@@ -78,28 +78,49 @@ export class AkeneoClient {
     params.append("password", this.config.password || "");
     // Note: Akeneo Cloud often uses username/password with client credentials for technical accounts
 
-    try {
-      const response = await axios.post<AkeneoTokenResponse>(
-        `${this.axiosInstance.defaults.baseURL}/api/oauth/v1/token`,
-        params,
-        {
-          headers: {
-            Authorization: `Basic ${authHeader}`,
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-        },
-      );
+    const maxRetries = 3;
+    let attempt = 0;
 
-      this.accessToken = response.data.access_token;
-      this.tokenExpiry = Math.floor(Date.now() / 1000) + response.data.expires_in;
-      return this.accessToken;
-    } catch (error: any) {
-      this.logger.error(
-        "Failed to refresh Akeneo access token:",
-        error.response?.data || error.message,
-      );
-      return null;
+    while (attempt < maxRetries) {
+      try {
+        const response = await axios.post<AkeneoTokenResponse>(
+          `${this.axiosInstance.defaults.baseURL}/api/oauth/v1/token`,
+          params,
+          {
+            headers: {
+              Authorization: `Basic ${authHeader}`,
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+          },
+        );
+
+        this.accessToken = response.data.access_token;
+        this.tokenExpiry = Math.floor(Date.now() / 1000) + response.data.expires_in;
+        return this.accessToken;
+      } catch (error: any) {
+        attempt++;
+        const status = error.response?.status;
+        const isTransient = status === 429 || (status >= 500 && status <= 599) || !status; // !status usually means network error
+
+        if (attempt < maxRetries && isTransient) {
+          const delay = Math.pow(2, attempt) * 1000;
+          this.logger.warn(
+            `Failed to refresh Akeneo token, retrying in ${delay}ms... (${
+              maxRetries - attempt
+            } attempts left)`,
+          );
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
+
+        this.logger.error(
+          "Failed to refresh Akeneo access token:",
+          error.response?.data || error.message,
+        );
+        return null;
+      }
     }
+    return null;
   }
 
   /**
@@ -116,14 +137,25 @@ export class AkeneoClient {
         const response = await this.axiosInstance.request<T>(config);
         return response.data;
       } catch (error: any) {
+        const status = error.response?.status;
+        const code = error.code;
+        const transientNetworkCodes = [
+          "ECONNRESET",
+          "ETIMEDOUT",
+          "ECONNREFUSED",
+          "EHOSTUNREACH",
+          "ENOTFOUND",
+        ];
+
         const isRetryable =
-          error.response?.status === 429 ||
-          (error.response?.status >= 500 && error.response?.status <= 599);
+          status === 429 ||
+          (status >= 500 && status <= 599) ||
+          transientNetworkCodes.includes(code);
 
         if (remRetries > 0 && isRetryable) {
-          const status = error.response?.status;
+          const reason = status ? `status ${status}` : `network code ${code}`;
           this.logger.warn(
-            `Akeneo API returned ${status}, retrying in ${currentDelay}ms... (${remRetries} attempts left)`,
+            `Akeneo API transient error (${reason}), retrying in ${currentDelay}ms... (${remRetries} attempts left)`,
           );
           await new Promise((resolve) => setTimeout(resolve, currentDelay));
           return attempt(remRetries - 1, currentDelay * 2);
