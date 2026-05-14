@@ -3,12 +3,13 @@ import { AkeneoClient } from "../client/akeneo.client.js";
 import axios from "axios";
 
 /**
- * Service for handling Akeneo assets.
+ * Service for handling Akeneo asset retrieval and downloading.
+ * Manages both product-level media files and asset-collection assets.
  */
 export class AkeneoAssetService {
   constructor(
-    private client: AkeneoClient,
-    private logger: Logger,
+    private readonly client: AkeneoClient,
+    private readonly logger: Logger,
   ) {}
 
   async getProductMediaFile(productUuid: string) {
@@ -86,8 +87,11 @@ export class AkeneoAssetService {
     const assetInfo = await this.client.getAssetsFromAssetFamily(assetFamilyCode, assetCodes);
 
     if (assetInfo.length === 0) return [];
+
     for (const asset of assetInfo) {
-      const mainAsset = asset?.values?.[assetFamily.attribute_as_main_media]?.[0]; // <== todo: select main media attribute with locale and scope.
+      const mainAsset = asset?.values?.[assetFamily.attribute_as_main_media]?.[0];
+      if (!mainAsset) continue;
+
       const mainAssetCode = mainAsset.data;
       const mainAssetData = mainAsset?.linked_data;
 

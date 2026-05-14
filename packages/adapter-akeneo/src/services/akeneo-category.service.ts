@@ -9,9 +9,9 @@ import { AkeneoMapper } from "../mappers/akeneo.mapper.js";
  */
 export class AkeneoCategoryService {
   constructor(
-    private client: AkeneoClient,
-    private mapper: AkeneoMapper,
-    private logger: Logger,
+    private readonly client: AkeneoClient,
+    private readonly mapper: AkeneoMapper,
+    private readonly logger: Logger,
   ) {}
 
   /**
