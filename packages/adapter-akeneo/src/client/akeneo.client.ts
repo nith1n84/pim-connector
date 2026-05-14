@@ -103,13 +103,36 @@ export class AkeneoClient {
   }
 
   /**
-   * Generic request helper
+   * Generic request helper with retry logic
    * @param config - Axios request configuration
    * @returns The parsed response data
    */
   async request<T>(config: AxiosRequestConfig): Promise<T> {
-    const response = await this.axiosInstance.request<T>(config);
-    return response.data;
+    const maxRetries = 3;
+    const initialDelay = 1000;
+
+    const attempt = async (remRetries: number, currentDelay: number): Promise<T> => {
+      try {
+        const response = await this.axiosInstance.request<T>(config);
+        return response.data;
+      } catch (error: any) {
+        const isRetryable =
+          error.response?.status === 429 ||
+          (error.response?.status >= 500 && error.response?.status <= 599);
+
+        if (remRetries > 0 && isRetryable) {
+          const status = error.response?.status;
+          this.logger.warn(
+            `Akeneo API returned ${status}, retrying in ${currentDelay}ms... (${remRetries} attempts left)`,
+          );
+          await new Promise((resolve) => setTimeout(resolve, currentDelay));
+          return attempt(remRetries - 1, currentDelay * 2);
+        }
+        throw error;
+      }
+    };
+
+    return attempt(maxRetries, initialDelay);
   }
 
   /**
