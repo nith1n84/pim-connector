@@ -135,8 +135,6 @@ export class SyncEngine {
 
       const sortedCategories = this.sortCategoriesByHierarchy(sourceCategories);
       await this.syncCategories(sortedCategories);
-
-      this.logger.info("Category sync completed successfully.");
     } catch (error) {
       this.logger.error("Category sync failed:", error);
       throw error;
@@ -160,7 +158,7 @@ export class SyncEngine {
         // Log action
         const action = targetId ? "Updating" : "Creating";
         const displayName = this.getDisplayName(sourceCategory.name) || sourceCategory.code;
-        this.logger.info(
+        this.logger.debug(
           `${this.options.dryRun ? "[DRY-RUN] " : ""}${action} collection: ${sourceCategory.code} (${displayName})`,
         );
 
@@ -176,7 +174,7 @@ export class SyncEngine {
           parentCollectionIdMap.set(sourceCategory.code, newTargetId);
           successCount++;
         } else {
-          this.logger.info(`[DRY-RUN] Skipped sync for ${sourceCategory.code}`);
+          this.logger.debug(`[DRY-RUN] Skipped sync for ${sourceCategory.code}`);
           successCount++;
         }
 
@@ -192,6 +190,8 @@ export class SyncEngine {
 
     // Save identity map persistence
     await this.categoryIdentityMap.save();
+
+    this.logger.info("Category sync completed.");
 
     this.logger.info("--------------------------------------------------");
     this.logger.info("Category sync summary:");
@@ -269,7 +269,7 @@ export class SyncEngine {
 
         // Log action
         const action = targetId ? "Updating" : "Creating";
-        this.logger.info(
+        this.logger.debug(
           `${this.options.dryRun ? "[DRY-RUN] " : ""}${action} product: ${sourceProduct.sku} ...`,
         );
 
@@ -280,7 +280,7 @@ export class SyncEngine {
           this.identityMap.setMapping(sourceId, newTargetId);
           return { success: true };
         } else {
-          this.logger.info(`[DRY-RUN] Skipped sync for ${sourceProduct.sku}`);
+          this.logger.debug(`[DRY-RUN] Skipped sync for ${sourceProduct.sku}`);
           return { success: true };
         }
       } catch (error) {

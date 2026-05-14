@@ -104,7 +104,7 @@ export class AkeneoClient {
 
         if (attempt < maxRetries && isTransient) {
           const delay = Math.pow(2, attempt) * 1000;
-          this.logger.warn(
+          this.logger.debug(
             `Failed to refresh Akeneo token, retrying in ${delay}ms... (${
               maxRetries - attempt
             } attempts left)`,
@@ -154,7 +154,7 @@ export class AkeneoClient {
 
         if (remRetries > 0 && isRetryable) {
           const reason = status ? `status ${status}` : `network code ${code}`;
-          this.logger.warn(
+          this.logger.debug(
             `Akeneo API transient error (${reason}), retrying in ${currentDelay}ms... (${remRetries} attempts left)`,
           );
           await new Promise((resolve) => setTimeout(resolve, currentDelay));

@@ -149,6 +149,8 @@ Options:
     concurrency: config.syncOptions?.concurrency,
   });
 
+  console.log("");
+
   if (command === "sync-categories") {
     await engine.runCategorySync();
   } else {

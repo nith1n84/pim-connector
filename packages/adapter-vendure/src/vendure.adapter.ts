@@ -39,7 +39,7 @@ export class VendureAdapter implements TargetAdapter {
   private static globalOptionIdMap: Map<string, string> = new Map(); // Shared across all products
   private static globalOptionGroupMap: Map<string, string> = new Map(); // Shared across all products
   private categoryIdentityMap: IdentityMap;
-  logger = new BasicLogger("VENDURE ADAPTER", process.env.LOG_LEVEL);
+  logger = new BasicLogger("VEN", process.env.LOG_LEVEL);
   private token: string = "";
 
   constructor(private config: VendureConfig) {
@@ -97,7 +97,7 @@ export class VendureAdapter implements TargetAdapter {
       } catch (error: any) {
         if (remRetries > 0 && this.isTransientError(error)) {
           const reason = this.getTransientReason(error);
-          this.logger.warn(
+          this.logger.debug(
             `Transient error (${reason}). Retrying in ${currentDelay}ms... (${remRetries} attempts left)`,
           );
           await new Promise((resolve) => setTimeout(resolve, currentDelay));
@@ -191,7 +191,7 @@ export class VendureAdapter implements TargetAdapter {
       );
       await this.requestWithRetry(UPDATE_PRODUCT, { input: updateInput });
       productId = existingProduct.id;
-      this.logger.info(`Updated product ${product.sku} (ID: ${productId})`);
+      this.logger.debug(`Updated product ${product.sku} (ID: ${productId})`);
     } else {
       const createInput = this.mapper.mapToCreateProductInput(product, assetIds);
 
@@ -199,7 +199,7 @@ export class VendureAdapter implements TargetAdapter {
         input: createInput,
       });
       productId = resp.createProduct.id;
-      this.logger.info(`Created product ${product.sku} (ID: ${productId})`);
+      this.logger.debug(`Created product ${product.sku} (ID: ${productId})`);
     }
 
     // Handle Option Groups first (required for variants)
