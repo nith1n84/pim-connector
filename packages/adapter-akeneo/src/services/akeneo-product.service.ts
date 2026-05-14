@@ -70,21 +70,22 @@ export class AkeneoProductService {
     }
 
     const familyCodes: string[] = [...familyToProducts.keys()];
+    const missingFamilyCodes = familyCodes.filter((code) => !this.familyMappings.has(code));
 
-    const families = await this.client.getFamilies(familyCodes);
-    const familyMappings: Map<string, { labelAttribute: string; imageAttribute: string | null }> =
-      new Map();
-    for (const family of families) {
-      familyMappings.set(family.code, {
-        labelAttribute: family.attribute_as_label || "name",
-        imageAttribute: family.attribute_as_image || null,
-      });
+    if (missingFamilyCodes.length > 0) {
+      const families = await this.client.getFamilies(missingFamilyCodes);
+      for (const family of families) {
+        this.familyMappings.set(family.code, {
+          labelAttribute: family.attribute_as_label || "name",
+          imageAttribute: family.attribute_as_image || null,
+        });
+      }
     }
 
     const allProducts: Product[] = [];
 
     for (const [familyCode, products] of familyToProducts) {
-      const familyMapping = familyMappings.get(familyCode);
+      const familyMapping = this.familyMappings.get(familyCode);
 
       if (!familyMapping) {
         continue;
