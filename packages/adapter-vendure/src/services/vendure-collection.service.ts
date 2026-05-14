@@ -15,7 +15,7 @@ export class VendureCollectionService {
   private static globalCollectionIdMap: Map<string, string> = new Map(); // Shared across all collections
 
   constructor(
-    private client: GraphQLClient,
+    private requester: <T>(query: string, variables?: any) => Promise<T>,
     private mapper: VendureMapper,
     private logger: Logger,
   ) {}
@@ -41,7 +41,7 @@ export class VendureCollectionService {
         category,
         parentId,
       );
-      await this.client.request(UPDATE_COLLECTION, { input: updateInput });
+      await this.requester(UPDATE_COLLECTION, { input: updateInput });
       collectionId = existingCollection.id;
     } else {
       const parentId = category.parentId
@@ -49,7 +49,7 @@ export class VendureCollectionService {
         : null;
       const createInput = this.mapper.mapToCreateCollectionInput(category, parentId);
 
-      const resp = await this.client.request<{ createCollection: { id: string } }>(
+      const resp = await this.requester<{ createCollection: { id: string } }>(
         CREATE_COLLECTION,
         { input: createInput },
       );
@@ -66,7 +66,7 @@ export class VendureCollectionService {
    */
   private async findCollectionBySlug(slug: string): Promise<{ id: string } | null> {
     try {
-      const resp = await this.client.request<{ collections: { items: Array<{ id: string }> } }>(
+      const resp = await this.requester<{ collections: { items: Array<{ id: string }> } }>(
         GET_COLLECTION_BY_SLUG,
         { slug },
       );

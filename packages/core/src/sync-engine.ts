@@ -209,7 +209,7 @@ export class SyncEngine {
     if (!name || typeof name !== "object") return undefined;
 
     // Try common locales
-    return name.en_US || name.en || Object.values(name)[0] as string;
+    return name.en_US || name.en || (Object.values(name)[0] as string);
   }
 
   /**

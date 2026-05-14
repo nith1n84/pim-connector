@@ -48,7 +48,11 @@ export class VendureAdapter implements TargetAdapter {
       this.setAuthToken(config.token);
     }
     this.mapper = new VendureMapper(config);
-    this.collectionService = new VendureCollectionService(this.client, this.mapper, this.logger);
+    this.collectionService = new VendureCollectionService(
+      this.requestWithRetry.bind(this),
+      this.mapper,
+      this.logger,
+    );
     this.assetMappingService = new AssetMappingService();
     this.categoryIdentityMap = config.categoryIdentityMap;
   }
@@ -91,9 +95,10 @@ export class VendureAdapter implements TargetAdapter {
       try {
         return await this.client.request<T>(query, variables);
       } catch (error: any) {
-        if (remRetries > 0 && error.message?.includes("database is locked")) {
+        if (remRetries > 0 && this.isTransientError(error)) {
+          const reason = this.getTransientReason(error);
           this.logger.warn(
-            `Database locked, retrying in ${currentDelay}ms... (${remRetries} attempts left)`,
+            `Transient error (${reason}). Retrying in ${currentDelay}ms... (${remRetries} attempts left)`,
           );
           await new Promise((resolve) => setTimeout(resolve, currentDelay));
           return attempt(remRetries - 1, currentDelay * 2);
@@ -103,6 +108,53 @@ export class VendureAdapter implements TargetAdapter {
     };
 
     return attempt(maxRetries, initialDelay);
+  }
+
+  private isTransientError(error: any): boolean {
+    const message = error.message?.toLowerCase() || "";
+
+    // 1. Database Lock Errors (SQLite, Postgres, MySQL)
+    if (
+      message.includes("database is locked") ||
+      message.includes("deadlock detected") ||
+      message.includes("lock wait timeout exceeded")
+    ) {
+      return true;
+    }
+
+    // 2. Common Network Errors
+    const transientNetworkCodes = [
+      "ECONNRESET",
+      "ETIMEDOUT",
+      "ECONNREFUSED",
+      "EHOSTUNREACH",
+      "ENOTFOUND",
+    ];
+    if (transientNetworkCodes.some((code) => message.includes(code.toLowerCase()))) {
+      return true;
+    }
+
+    // 3. HTTP Status Codes (Rate limits and Gateway errors)
+    const status = error.response?.status;
+    if (status && [429, 502, 503, 504].includes(status)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  private getTransientReason(error: any): string {
+    const message = error.message?.toLowerCase() || "";
+    if (message.includes("database is locked")) return "Database Locked (SQLite)";
+    if (message.includes("deadlock detected")) return "Database Deadlock (Postgres)";
+    if (message.includes("lock wait timeout exceeded")) return "Lock Wait Timeout (MySQL)";
+
+    if (error.code) return `Network Error (${error.code})`;
+    const status = error.response?.status;
+    if (status) return `HTTP Error (${status})`;
+
+    // Fallback: take a small snippet of the message if nothing else matches
+    return message.length > 100 ? message.substring(0, 100) + "..." : message;
   }
 
   async upsertProduct(product: Product, targetId?: string): Promise<string> {
@@ -203,7 +255,7 @@ export class VendureAdapter implements TargetAdapter {
 
   private async findProductBySku(sku: string): Promise<VendureProduct | null> {
     try {
-      const resp = await this.client.request<{
+      const resp = await this.requestWithRetry<{
         productVariants: { items: any[] };
       }>(GET_PRODUCT_BY_VARIANT_SKU, { sku });
       return resp.productVariants.items[0]?.product || null;
@@ -215,7 +267,7 @@ export class VendureAdapter implements TargetAdapter {
 
   private async getProductById(id: string): Promise<VendureProduct | null> {
     try {
-      const resp = await this.client.request<{
+      const resp = await this.requestWithRetry<{
         product: VendureProduct;
       }>(GET_PRODUCT_BY_ID, { id });
       return resp.product || null;
