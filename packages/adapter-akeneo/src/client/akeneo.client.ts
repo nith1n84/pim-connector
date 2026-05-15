@@ -80,16 +80,53 @@ export class AkeneoClient {
   }
 
   /**
-   * Refreshes the OAuth2 access token using the password grant flow.
+   * Refreshes the OAuth2 access token.
+   * Attempts to use a refresh token if available, otherwise falls back to password grant.
    */
   private async refreshAccessToken(): Promise<string | null> {
     const authHeader = Buffer.from(`${this.config.clientId}:${this.config.secret}`).toString(
       "base64",
     );
-    const params = new URLSearchParams();
-    params.append("grant_type", "password");
-    params.append("username", this.config.username || "");
-    params.append("password", this.config.password || "");
+
+    // 1. Try Refresh Token Grant if available in store
+    if (this.tokenStore) {
+      const authToken = await this.tokenStore.getAuthToken("akeneo");
+      if (authToken?.refreshToken) {
+        this.logger.debug("Attempting to refresh Akeneo access token using refresh token...");
+        const refreshed = await this.executeTokenRequest(
+          {
+            grant_type: "refresh_token",
+            refresh_token: authToken.refreshToken,
+          },
+          authHeader,
+        );
+
+        if (refreshed) return refreshed;
+        this.logger.debug("Refresh token grant failed or expired. Falling back to password grant.");
+      }
+    }
+
+    // 2. Fallback to Password Grant
+    const params = {
+      grant_type: "password",
+      username: this.config.username || "",
+      password: this.config.password || "",
+    };
+
+    return this.executeTokenRequest(params, authHeader);
+  }
+
+  /**
+   * Executes a token request (either password or refresh_token grant).
+   */
+  private async executeTokenRequest(
+    params: Record<string, string>,
+    authHeader: string,
+  ): Promise<string | null> {
+    const urlParams = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      urlParams.append(key, value);
+    }
 
     const maxRetries = 3;
     let attempt = 0;
@@ -98,7 +135,7 @@ export class AkeneoClient {
       try {
         const response = await axios.post<AkeneoTokenResponse>(
           `${this.axiosInstance.defaults.baseURL}/api/oauth/v1/token`,
-          params,
+          urlParams,
           {
             headers: {
               Authorization: `Basic ${authHeader}`,
@@ -110,9 +147,14 @@ export class AkeneoClient {
         this.accessToken = response.data.access_token;
         this.tokenExpiry = Math.floor(Date.now() / 1000) + response.data.expires_in;
 
-        // Save to shared token store
+        // Save to shared token store (including new refresh token)
         if (this.tokenStore) {
-          await this.tokenStore.saveToken("akeneo", this.accessToken, response.data.expires_in);
+          await this.tokenStore.saveToken(
+            "akeneo",
+            this.accessToken,
+            response.data.expires_in,
+            response.data.refresh_token,
+          );
         }
 
         return this.accessToken;
@@ -123,15 +165,17 @@ export class AkeneoClient {
 
         if (attempt < maxRetries && isTransient) {
           const delay = Math.pow(2, attempt) * 1000;
-          this.logger.debug(`Failed to refresh Akeneo token, retrying in ${delay}ms...`);
+          this.logger.debug(`Token request failed, retrying in ${delay}ms...`);
           await new Promise((resolve) => setTimeout(resolve, delay));
           continue;
         }
 
-        this.logger.error(
-          "Failed to refresh Akeneo access token:",
-          error.response?.data || error.message,
-        );
+        // If it's a 400 error during refresh, it likely means the refresh token is invalid
+        if (status === 400 && params.grant_type === "refresh_token") {
+          return null;
+        }
+
+        this.logger.error("Akeneo token request failed:", error.response?.data || error.message);
         return null;
       }
     }

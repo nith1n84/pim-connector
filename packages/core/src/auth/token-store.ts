@@ -2,6 +2,7 @@ import { StorageProvider } from "../storage/storage.interface.js";
 
 export interface AuthToken {
   token: string;
+  refreshToken?: string;
   expiry?: number; // Unix timestamp in seconds
 }
 
@@ -13,38 +14,47 @@ export class TokenStore {
 
   /**
    * Saves a token for a specific adapter.
-   * @param adapterName - Name of the adapter (e.g., 'akeneo', 'vendure').
-   * @param token - The token string.
-   * @param expiresInSeconds - Optional duration until the token expires.
    */
-  async saveToken(adapterName: string, token: string, expiresInSeconds?: number): Promise<void> {
+  async saveToken(
+    adapterName: string,
+    token: string,
+    expiresInSeconds?: number,
+    refreshToken?: string,
+  ): Promise<void> {
     const key = this.generateKey(adapterName);
     const authToken: AuthToken = {
       token,
+      refreshToken,
       expiry: expiresInSeconds ? Math.floor(Date.now() / 1000) + expiresInSeconds : undefined,
     };
     await this.provider.write(key, JSON.stringify(authToken, null, 2));
   }
 
   /**
-   * Retrieves a valid token for a specific adapter.
-   * Returns null if no token exists or if it has expired.
+   * Retrieves a full token object for a specific adapter.
    */
-  async getToken(adapterName: string): Promise<string | null> {
+  async getAuthToken(adapterName: string): Promise<AuthToken | null> {
     const key = this.generateKey(adapterName);
     const data = await this.provider.read(key);
     if (!data) return null;
-
     try {
-      const authToken: AuthToken = JSON.parse(data);
-      if (authToken.expiry && authToken.expiry < Math.floor(Date.now() / 1000) + 60) {
-        // Expired or expiring within 60 seconds
-        return null;
-      }
-      return authToken.token;
+      return JSON.parse(data);
     } catch {
       return null;
     }
+  }
+
+  /**
+   * Retrieves a valid access token string for a specific adapter.
+   */
+  async getToken(adapterName: string): Promise<string | null> {
+    const authToken = await this.getAuthToken(adapterName);
+    if (!authToken) return null;
+
+    if (authToken.expiry && authToken.expiry < Math.floor(Date.now() / 1000) + 60) {
+      return null;
+    }
+    return authToken.token;
   }
 
   private generateKey(adapterName: string): string {
