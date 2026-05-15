@@ -11,7 +11,7 @@ import {
   AkeneoProductModel,
   AkeneoTokenResponse,
 } from "../types/akeneo.types.js";
-import { Logger, OptionGroup, Page } from "@pim-connector/core";
+import { Logger, OptionGroup, Page, TokenStore } from "@pim-connector/core";
 import { formatAkeneoDate } from "../utils/akeneo.utils.js";
 
 /**
@@ -31,6 +31,7 @@ export class AkeneoClient {
   constructor(
     private readonly config: AkeneoConfig,
     private readonly logger: Logger,
+    private readonly tokenStore?: TokenStore,
   ) {
     this.axiosInstance = axios.create({
       baseURL: config.url.endsWith("/") ? config.url.slice(0, -1) : config.url,
@@ -64,6 +65,17 @@ export class AkeneoClient {
     if (this.accessToken && this.tokenExpiry && now < this.tokenExpiry - 60) {
       return this.accessToken;
     }
+
+    // Try to get from shared token store
+    if (this.tokenStore) {
+      const sharedToken = await this.tokenStore.getToken("akeneo");
+      if (sharedToken) {
+        this.accessToken = sharedToken;
+        // We don't have the exact expiry but we know it's valid if store returned it
+        return this.accessToken;
+      }
+    }
+
     return this.refreshAccessToken();
   }
 
@@ -97,6 +109,12 @@ export class AkeneoClient {
 
         this.accessToken = response.data.access_token;
         this.tokenExpiry = Math.floor(Date.now() / 1000) + response.data.expires_in;
+
+        // Save to shared token store
+        if (this.tokenStore) {
+          await this.tokenStore.saveToken("akeneo", this.accessToken, response.data.expires_in);
+        }
+
         return this.accessToken;
       } catch (error: any) {
         attempt++;

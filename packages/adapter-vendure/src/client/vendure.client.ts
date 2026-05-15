@@ -1,5 +1,5 @@
 import { GraphQLClient } from "graphql-request";
-import { Logger } from "@pim-connector/core";
+import { Logger, TokenStore } from "@pim-connector/core";
 import { LOGIN, CREATE_ASSETS, VendureConfig } from "../types/vendure.types.js";
 
 /**
@@ -13,6 +13,7 @@ export class VendureClient {
   constructor(
     private readonly config: VendureConfig,
     private readonly logger: Logger,
+    private readonly tokenStore?: TokenStore,
   ) {
     this.client = new GraphQLClient(config.url);
     if (config.token) {
@@ -33,6 +34,16 @@ export class VendureClient {
    * Authenticates with Vendure using email and password.
    */
   async authenticate(): Promise<void> {
+    // Try to get from shared token store
+    if (this.tokenStore) {
+      const sharedToken = await this.tokenStore.getToken("vendure");
+      if (sharedToken) {
+        this.setAuthToken(sharedToken);
+        this.logger.debug("Reused existing Vendure session token from shared store.");
+        return;
+      }
+    }
+
     if (!this.config.email || !this.config.password) {
       return;
     }
@@ -47,6 +58,11 @@ export class VendureClient {
       if (token) {
         this.setAuthToken(token);
         this.logger.info("Authenticated successfully with Vendure.");
+
+        // Save to shared token store (Vendure tokens are usually valid for 7 days by default)
+        if (this.tokenStore) {
+          await this.tokenStore.saveToken("vendure", token, 3600 * 24); // Assume 24h safety
+        }
       } else {
         this.logger.debug("Login successful but no token received in headers.");
       }

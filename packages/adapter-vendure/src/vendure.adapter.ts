@@ -24,7 +24,7 @@ export class VendureAdapter implements TargetAdapter {
   private assetIdentityMap: IdentityMap;
 
   constructor(private readonly config: VendureConfig) {
-    this.client = new VendureClient(config, this.logger);
+    this.client = new VendureClient(config, this.logger, config.tokenStore);
     this.mapper = new VendureMapper(config);
     this.categoryIdentityMap = config.categoryIdentityMap;
     this.assetIdentityMap = config.assetIdentityMap;

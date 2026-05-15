@@ -1,5 +1,5 @@
 import { gql } from "graphql-request";
-import { IdentityMap } from "@pim-connector/core";
+import { IdentityMap, TokenStore } from "@pim-connector/core";
 
 export interface VendureConfig {
   url: string;
@@ -15,6 +15,7 @@ export interface VendureConfig {
   syncCategories?: boolean;
   categoryIdentityMap: IdentityMap;
   assetIdentityMap: IdentityMap;
+  tokenStore?: TokenStore;
 }
 
 export interface VendureProduct {

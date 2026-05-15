@@ -1,4 +1,11 @@
-import { Asset, BasicLogger, Category, Product, SourceAdapter } from "@pim-connector/core";
+import {
+  Asset,
+  BasicLogger,
+  Category,
+  Product,
+  SourceAdapter,
+  TokenStore,
+} from "@pim-connector/core";
 import { AkeneoClient } from "./client/akeneo.client.js";
 import { AkeneoMapper } from "./mappers/akeneo.mapper.js";
 import { AkeneoCategoryService } from "./services/akeneo-category.service.js";
@@ -18,9 +25,9 @@ export class AkeneoAdapter implements SourceAdapter {
   private config: AkeneoConfig;
   logger = new BasicLogger("AKN", process.env.LOG_LEVEL);
 
-  constructor(config: AkeneoConfig) {
+  constructor(config: AkeneoConfig, tokenStore?: TokenStore) {
     this.config = config;
-    this.client = new AkeneoClient(config, this.logger);
+    this.client = new AkeneoClient(config, this.logger, tokenStore);
     this.mapper = new AkeneoMapper(config.locales, config.scopes);
     this.productService = new AkeneoProductService(this.client, this.mapper, this.logger);
     this.categoryService = new AkeneoCategoryService(this.client, this.mapper, this.logger);

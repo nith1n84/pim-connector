@@ -1,6 +1,14 @@
 import { parseArgs } from "node:util";
-import { dirname, join } from "node:path";
-import { BasicLogger, FileStorageProvider, MappingManager, SyncEngine } from "@pim-connector/core";
+import { dirname } from "node:path";
+import {
+  BasicLogger,
+  FileStorageProvider,
+  MappingManager,
+  SyncEngine,
+  SyncReporter,
+  SyncStateManager,
+  TokenStore,
+} from "@pim-connector/core";
 import { AkeneoAdapter } from "@pim-connector/adapter-akeneo";
 import { VendureAdapter } from "@pim-connector/adapter-vendure";
 import { ConfigLoader } from "./services/config-loader.js";
@@ -31,6 +39,7 @@ async function main() {
   }
 
   const command = positionals[0];
+  const runStartTime = new Date();
   logger.info(`Starting PIM Connector... ${values["dry-run"] ? "(DRY RUN)" : ""}`);
 
   try {
@@ -43,14 +52,22 @@ async function main() {
     const projectDir = dirname(configPath);
     const storageProvider = new FileStorageProvider(projectDir);
     const mappingManager = new MappingManager(storageProvider, "akeneo", "vendure");
+    const stateManager = new SyncStateManager(storageProvider);
+    const tokenStore = new TokenStore(storageProvider);
 
     // 3. Initialize Identity Maps for Entities
     const productMap = await mappingManager.getIdentityMap("products");
     const categoryMap = await mappingManager.getIdentityMap("categories");
     const assetMap = await mappingManager.getIdentityMap("assets");
 
-    // 4. Initialize Adapters
-    const source = new AkeneoAdapter(config.source.config);
+    // 4. Initialize Reporter
+    const reporter = new SyncReporter(
+      storageProvider,
+      command === "sync-categories" ? "category" : "product",
+    );
+
+    // 5. Initialize Adapters
+    const source = new AkeneoAdapter(config.source.config, tokenStore);
     const target = new VendureAdapter({
       ...config.target.config,
       retries: config.syncOptions?.retries,
@@ -59,28 +76,52 @@ async function main() {
       excludeAttributes: config.mapping.excludeAttributes,
       categoryIdentityMap: categoryMap,
       assetIdentityMap: assetMap,
+      tokenStore: tokenStore,
     });
 
     await Promise.all([source.initialize(), target.initialize()]);
 
-    // 5. Run Sync Engine
+    // 6. Run Sync Engine
     const engine = new SyncEngine(source, target, productMap, categoryMap, logger, {
       delayMs: config.syncOptions?.delayMs,
       dryRun: !!values["dry-run"],
       batchSize: config.syncOptions?.batchSize,
       concurrency: config.syncOptions?.concurrency,
+      reporter: reporter,
     });
 
     if (command === "sync-categories") {
       await engine.runCategorySync();
     } else {
-      const sinceDate = parseSinceDate(values.since);
+      // Automatic Delta Sync logic
+      let sinceDate: Date | undefined;
+      if (values.since) {
+        sinceDate = parseSinceDate(values.since);
+      } else {
+        sinceDate = (await stateManager.getLastRunDate()) || undefined;
+        if (sinceDate) {
+          logger.info(`Performing delta sync since last run: ${sinceDate.toISOString()}`);
+        } else {
+          logger.info("No previous sync state found. Performing full sync.");
+        }
+      }
+
       await engine.syncProducts(sinceDate);
+
+      // Update state on success
+      if (!values["dry-run"]) {
+        await stateManager.updateState({
+          lastRunStartTime: runStartTime.toISOString(),
+          lastSuccessfulRun: new Date().toISOString(),
+        });
+      }
     }
 
-    // Save mapping for assets (special case as it's modified within the adapter)
+    // 7. Finalize Results
     if (!values["dry-run"]) {
       await assetMap.save();
+      const reportKey = await reporter.save();
+      logger.info(`Run report saved to: ${reportKey}`);
     }
 
     logger.info("Sync operation completed successfully.");

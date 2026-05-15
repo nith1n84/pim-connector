@@ -1,12 +1,14 @@
 import { Logger, SourceAdapter, TargetAdapter } from "./adapter.interface.js";
 import { IdentityMap } from "./identity-map.js";
 import { ParallelProcessor } from "./utils/parallel-processor.js";
+import { SyncReporter } from "./reporting/sync-reporter.js";
 
 export interface SyncOptions {
   delayMs?: number;
   dryRun?: boolean;
   batchSize?: number;
   concurrency?: number;
+  reporter?: SyncReporter;
 }
 
 /**
@@ -112,9 +114,11 @@ export class SyncEngine {
 
       const newTargetId = await this.target.upsertProduct(product, targetId);
       this.identityMap.setMapping(sourceId, newTargetId);
+      this.options.reporter?.logSuccess(product.sku || product.id);
       return { success: true };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to sync product ${product.sku || product.id}:`, error);
+      this.options.reporter?.logError(product.sku || product.id, error.message);
       return { success: false };
     }
   }
@@ -133,13 +137,15 @@ export class SyncEngine {
           this.categoryIdentityMap.setMapping(sourceId, newId);
           parentMap.set(cat.code, newId);
         }
+        this.options.reporter?.logSuccess(cat.code);
         success++;
 
         if (this.options.delayMs) {
           await new Promise((r) => setTimeout(r, this.options.delayMs));
         }
-      } catch (error) {
+      } catch (error: any) {
         this.logger.error(`Failed to sync category ${cat.code}:`, error);
+        this.options.reporter?.logError(cat.code, error.message);
       }
     }
   }
