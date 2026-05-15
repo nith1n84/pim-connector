@@ -55,73 +55,85 @@ async function main() {
     const stateManager = new SyncStateManager(storageProvider);
     const tokenStore = new TokenStore(storageProvider);
 
-    // 3. Initialize Identity Maps for Entities
-    const productMap = await mappingManager.getIdentityMap("products");
-    const categoryMap = await mappingManager.getIdentityMap("categories");
-    const assetMap = await mappingManager.getIdentityMap("assets");
+    // 2.1 Acquire Lock (Skip for dry-run to allow testing during active syncs)
+    if (!values["dry-run"]) {
+      await stateManager.acquireLock();
+    }
 
-    // 4. Initialize Reporter
-    const reporter = new SyncReporter(
-      storageProvider,
-      command === "sync-categories" ? "category" : "product",
-    );
+    try {
+      // 3. Initialize Identity Maps for Entities
+      const productMap = await mappingManager.getIdentityMap("products");
+      const categoryMap = await mappingManager.getIdentityMap("categories");
+      const assetMap = await mappingManager.getIdentityMap("assets");
 
-    // 5. Initialize Adapters
-    const source = new AkeneoAdapter(config.source.config, tokenStore);
-    const target = new VendureAdapter({
-      ...config.target.config,
-      retries: config.syncOptions?.retries,
-      retryDelayMs: config.syncOptions?.retryDelayMs,
-      includeAttributes: config.mapping.includeAttributes,
-      excludeAttributes: config.mapping.excludeAttributes,
-      categoryIdentityMap: categoryMap,
-      assetIdentityMap: assetMap,
-      tokenStore: tokenStore,
-    });
+      // 4. Initialize Reporter
+      const reporter = new SyncReporter(
+        storageProvider,
+        command === "sync-categories" ? "category" : "product",
+      );
 
-    await Promise.all([source.initialize(), target.initialize()]);
+      // 5. Initialize Adapters
+      const source = new AkeneoAdapter(config.source.config, tokenStore);
+      const target = new VendureAdapter({
+        ...config.target.config,
+        retries: config.syncOptions?.retries,
+        retryDelayMs: config.syncOptions?.retryDelayMs,
+        includeAttributes: config.mapping.includeAttributes,
+        excludeAttributes: config.mapping.excludeAttributes,
+        categoryIdentityMap: categoryMap,
+        assetIdentityMap: assetMap,
+        tokenStore: tokenStore,
+      });
 
-    // 6. Run Sync Engine
-    const engine = new SyncEngine(source, target, productMap, categoryMap, logger, {
-      delayMs: config.syncOptions?.delayMs,
-      dryRun: !!values["dry-run"],
-      batchSize: config.syncOptions?.batchSize,
-      concurrency: config.syncOptions?.concurrency,
-      reporter: reporter,
-    });
+      await Promise.all([source.initialize(), target.initialize()]);
 
-    if (command === "sync-categories") {
-      await engine.runCategorySync();
-    } else {
-      // Automatic Delta Sync logic
-      let sinceDate: Date | undefined;
-      if (values.since) {
-        sinceDate = parseSinceDate(values.since);
+      // 6. Run Sync Engine
+      const engine = new SyncEngine(source, target, productMap, categoryMap, logger, {
+        delayMs: config.syncOptions?.delayMs,
+        dryRun: !!values["dry-run"],
+        batchSize: config.syncOptions?.batchSize,
+        concurrency: config.syncOptions?.concurrency,
+        reporter: reporter,
+      });
+
+      if (command === "sync-categories") {
+        await engine.runCategorySync();
       } else {
-        sinceDate = (await stateManager.getLastRunDate()) || undefined;
-        if (sinceDate) {
-          logger.info(`Performing delta sync since last run: ${sinceDate.toISOString()}`);
+        // Automatic Delta Sync logic
+        let sinceDate: Date | undefined;
+        if (values.since) {
+          sinceDate = parseSinceDate(values.since);
         } else {
-          logger.info("No previous sync state found. Performing full sync.");
+          sinceDate = (await stateManager.getLastRunDate()) || undefined;
+          if (sinceDate) {
+            logger.info(`Performing delta sync since last run: ${sinceDate.toISOString()}`);
+          } else {
+            logger.info("No previous sync state found. Performing full sync.");
+          }
+        }
+
+        await engine.syncProducts(sinceDate);
+
+        // Update state on success
+        if (!values["dry-run"]) {
+          await stateManager.updateState({
+            lastRunStartTime: runStartTime.toISOString(),
+            lastSuccessfulRun: new Date().toISOString(),
+          });
         }
       }
 
-      await engine.syncProducts(sinceDate);
-
-      // Update state on success
+      // 7. Finalize Results
       if (!values["dry-run"]) {
-        await stateManager.updateState({
-          lastRunStartTime: runStartTime.toISOString(),
-          lastSuccessfulRun: new Date().toISOString(),
-        });
+        await assetMap.save();
+        const reportKey = await reporter.save();
+        logger.info(`Run report saved to: ${reportKey}`);
       }
-    }
-
-    // 7. Finalize Results
-    if (!values["dry-run"]) {
-      await assetMap.save();
-      const reportKey = await reporter.save();
-      logger.info(`Run report saved to: ${reportKey}`);
+    } finally {
+      // 8. Always release lock if we acquired it
+      if (!values["dry-run"]) {
+        await stateManager.releaseLock();
+      }
     }
 
     logger.info("Sync operation completed successfully.");
