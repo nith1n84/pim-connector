@@ -60,7 +60,7 @@ export class SyncReporter {
   async save(): Promise<string> {
     this.report.endTime = new Date().toISOString();
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const key = `.sync-data/reports/${this.report.type}-run-${timestamp}.json`;
+    const key = `${this.report.type}-run-${timestamp}.json`;
 
     await this.provider.write(key, JSON.stringify(this.report, null, 2));
     return key;

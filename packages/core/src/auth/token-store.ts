@@ -58,6 +58,6 @@ export class TokenStore {
   }
 
   private generateKey(adapterName: string): string {
-    return `.sync-data/auth/${adapterName}-token.json`;
+    return `${adapterName}-token.json`;
   }
 }

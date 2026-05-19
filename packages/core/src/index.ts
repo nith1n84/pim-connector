@@ -8,6 +8,8 @@ export * from "./config.schema.js";
 export * from "./mapping-manager.js";
 export * from "./storage/storage.interface.js";
 export * from "./storage/file-storage.js";
+export * from "./storage/s3-storage.js";
+export * from "./storage/storage.factory.js";
 export * from "./state/sync-state-manager.js";
 export * from "./auth/token-store.js";
 export * from "./reporting/sync-reporter.js";

@@ -5,8 +5,6 @@ import { StorageProvider } from "./storage/storage.interface.js";
  * Service for managing multiple identity maps with standardized naming.
  */
 export class MappingManager {
-  private readonly storageDir = ".sync-data";
-
   constructor(
     private readonly provider: StorageProvider,
     private readonly sourceName: string,
@@ -27,9 +25,9 @@ export class MappingManager {
 
   /**
    * Generates a standardized storage key for an entity.
-   * Pattern: .sync-data/{source}-{target}-{entity}-map.json
+   * Pattern: {source}-{target}-{entity}-map.json
    */
   private generateKey(entity: string): string {
-    return `${this.storageDir}/${this.sourceName}-${this.targetName}-${entity}-map.json`;
+    return `${this.sourceName}-${this.targetName}-${entity}-map.json`;
   }
 }

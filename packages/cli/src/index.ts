@@ -1,5 +1,5 @@
 import { parseArgs } from "node:util";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import {
   BasicLogger,
   FileStorageProvider,
@@ -8,6 +8,7 @@ import {
   SyncReporter,
   SyncStateManager,
   TokenStore,
+  createStorageProvider,
 } from "@pim-connector/core";
 import { AkeneoAdapter } from "@pim-connector/adapter-akeneo";
 import { VendureAdapter } from "@pim-connector/adapter-vendure";
@@ -50,10 +51,53 @@ async function main() {
 
     // 2. Initialize Persistence Layer
     const projectDir = dirname(configPath);
-    const storageProvider = new FileStorageProvider(projectDir);
-    const mappingManager = new MappingManager(storageProvider, "akeneo", "vendure");
-    const stateManager = new SyncStateManager(storageProvider);
-    const tokenStore = new TokenStore(storageProvider);
+
+    // Helper to get store configuration with local path fallback relative to config directory
+    const getStoreConfig = (storeName: string, adapterConfig: any, fallbackDir: string) => {
+      const store = adapterConfig?.stores?.[storeName];
+      if (store) {
+        if (store.type === "local" && store.config?.baseDir) {
+          return {
+            type: "local",
+            config: {
+              ...store.config,
+              baseDir: join(projectDir, store.config.baseDir),
+            },
+          };
+        }
+        return store;
+      }
+      return {
+        type: "local",
+        config: {
+          baseDir: join(projectDir, fallbackDir),
+        },
+      };
+    };
+
+    // Instantiate individual storage providers
+    const sourceTokenStoreConfig = getStoreConfig("token", config.source, ".sync-data/auth");
+    const sourceTokenStorage = createStorageProvider(sourceTokenStoreConfig);
+    const sourceTokenStore = new TokenStore(sourceTokenStorage);
+
+    const targetTokenStoreConfig = getStoreConfig("token", config.target, ".sync-data/auth");
+    const targetTokenStorage = createStorageProvider(targetTokenStoreConfig);
+    const targetTokenStore = new TokenStore(targetTokenStorage);
+
+    const mappingStoreConfig = getStoreConfig("mapping", config.source, ".sync-data");
+    const mappingStorage = createStorageProvider(mappingStoreConfig);
+    const mappingManager = new MappingManager(mappingStorage, "akeneo", "vendure");
+
+    const syncStateStoreConfig = getStoreConfig("syncState", config.source, ".sync-data");
+    const syncStateStorage = createStorageProvider(syncStateStoreConfig);
+    const stateManager = new SyncStateManager(syncStateStorage);
+
+    const syncReporterStoreConfig = getStoreConfig(
+      "syncReporter",
+      config.source,
+      ".sync-data/reports",
+    );
+    const syncReporterStorage = createStorageProvider(syncReporterStoreConfig);
 
     // 2.1 Acquire Lock (Skip for dry-run to allow testing during active syncs)
     if (!values["dry-run"]) {
@@ -68,12 +112,12 @@ async function main() {
 
       // 4. Initialize Reporter
       const reporter = new SyncReporter(
-        storageProvider,
+        syncReporterStorage,
         command === "sync-categories" ? "category" : "product",
       );
 
       // 5. Initialize Adapters
-      const source = new AkeneoAdapter(config.source.config, tokenStore);
+      const source = new AkeneoAdapter(config.source.config, sourceTokenStore);
       const target = new VendureAdapter({
         ...config.target.config,
         retries: config.syncOptions?.retries,
@@ -82,7 +126,7 @@ async function main() {
         excludeAttributes: config.mapping.excludeAttributes,
         categoryIdentityMap: categoryMap,
         assetIdentityMap: assetMap,
-        tokenStore: tokenStore,
+        tokenStore: targetTokenStore,
       });
 
       await Promise.all([source.initialize(), target.initialize()]);

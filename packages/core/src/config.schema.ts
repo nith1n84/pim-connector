@@ -1,5 +1,30 @@
 import { z } from "zod";
 
+const LocalStoreConfigSchema = z.object({
+  type: z.literal("local"),
+  config: z.object({
+    baseDir: z.string(),
+  }),
+});
+
+const S3StoreConfigSchema = z.object({
+  type: z.literal("s3"),
+  config: z.object({
+    bucket: z.string(),
+    region: z.string(),
+    prefix: z.string().optional(),
+    credentials: z
+      .object({
+        accessKeyId: z.string(),
+        secretAccessKey: z.string(),
+      })
+      .optional(),
+  }),
+});
+
+const StoreSchema = z.discriminatedUnion("type", [LocalStoreConfigSchema, S3StoreConfigSchema]);
+const AdapterStoresSchema = z.record(z.string(), StoreSchema);
+
 export const SourceAkeneoSchema = z.object({
   adapter: z.literal("akeneo"),
   config: z.object({
@@ -11,6 +36,7 @@ export const SourceAkeneoSchema = z.object({
     locales: z.array(z.string()),
     scopes: z.array(z.string()),
   }),
+  stores: AdapterStoresSchema.optional(),
 });
 
 export const TargetVendureSchema = z.object({
@@ -23,6 +49,7 @@ export const TargetVendureSchema = z.object({
     localeMap: z.record(z.string(), z.string()),
     channelMap: z.record(z.string(), z.string()),
   }),
+  stores: AdapterStoresSchema.optional(),
 });
 
 export const MappingSchema = z.object({
