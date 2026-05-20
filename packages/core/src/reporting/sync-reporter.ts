@@ -4,7 +4,7 @@ export interface SyncReport {
   id: string;
   startTime: string;
   endTime?: string;
-  type: "product" | "category";
+  type: "product" | "category" | "schema";
   summary: {
     total: number;
     success: number;
@@ -25,7 +25,7 @@ export class SyncReporter {
 
   constructor(
     private readonly provider: StorageProvider,
-    type: "product" | "category",
+    type: "product" | "category" | "schema",
   ) {
     this.report = {
       id: `run-${Date.now()}`,

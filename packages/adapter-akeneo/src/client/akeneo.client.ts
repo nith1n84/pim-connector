@@ -287,6 +287,41 @@ export class AkeneoClient {
   }
 
   /**
+   * Retrieves all attribute codes belonging to a specific family.
+   * Calls GET /api/rest/v1/families/:code/attributes
+   */
+  async getFamilyAttributes(familyCode: string): Promise<string[]> {
+    const attributeCodes: string[] = [];
+    try {
+      for await (const items of this.paginate<{ code: string }>(
+        `/api/rest/v1/families/${familyCode}/attributes`,
+      )) {
+        attributeCodes.push(...items.map((a) => a.code));
+      }
+    } catch (error) {
+      this.logger.debug(`Could not fetch attributes for family ${familyCode}:`, error);
+    }
+    return attributeCodes;
+  }
+
+  /**
+   * Fetches full attribute definitions by their codes.
+   * Calls GET /api/rest/v1/attributes filtered by code.
+   */
+  async getAllAttributes(codes?: string[]): Promise<any[]> {
+    const filter = codes && codes.length > 0
+      ? { code: [{ operator: "IN" as const, value: codes }] }
+      : {};
+    const attributes: any[] = [];
+    for await (const items of this.paginate<any>("/api/rest/v1/attributes", {
+      search: JSON.stringify(filter),
+    })) {
+      attributes.push(...items);
+    }
+    return attributes;
+  }
+
+  /**
    * Fetches products based on pagination and last update date.
    */
   async getProducts(page: number, limit: number, updatedDate?: Date): Promise<Page<AkeneoProduct>> {

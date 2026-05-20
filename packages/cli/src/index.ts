@@ -7,10 +7,12 @@ import {
   SyncEngine,
   SyncReporter,
   SyncStateManager,
+  TargetAdapter,
   TokenStore,
 } from "@pim-connector/core";
 import { AkeneoAdapter } from "@pim-connector/adapter-akeneo";
 import { VendureAdapter } from "@pim-connector/adapter-vendure";
+import { MagentoAdapter } from "@pim-connector/adapter-magento";
 import { ConfigLoader } from "./services/config-loader.js";
 
 /**
@@ -29,11 +31,9 @@ async function main() {
   const { values, positionals } = args;
   const logger = new BasicLogger("CLI", process.env.LOG_LEVEL);
 
-  if (
-    values.help ||
-    positionals.length === 0 ||
-    !["sync", "sync-categories"].includes(positionals[0])
-  ) {
+  const VALID_COMMANDS = ["sync", "sync-products", "sync-categories", "sync-schema"];
+
+  if (values.help || positionals.length === 0 || !VALID_COMMANDS.includes(positionals[0])) {
     showHelp();
     return;
   }
@@ -67,23 +67,38 @@ async function main() {
       const assetMap = await mappingManager.getIdentityMap("assets");
 
       // 4. Initialize Reporter
-      const reporter = new SyncReporter(
-        storageProvider,
-        command === "sync-categories" ? "category" : "product",
-      );
+      const reporterType =
+        command === "sync-categories" ? "category"
+        : command === "sync-schema"   ? "schema"
+        : "product";
+      const reporter = new SyncReporter(storageProvider, reporterType);
 
       // 5. Initialize Adapters
       const source = new AkeneoAdapter(config.source.config, tokenStore);
-      const target = new VendureAdapter({
-        ...config.target.config,
-        retries: config.syncOptions?.retries,
-        retryDelayMs: config.syncOptions?.retryDelayMs,
-        includeAttributes: config.mapping.includeAttributes,
-        excludeAttributes: config.mapping.excludeAttributes,
-        categoryIdentityMap: categoryMap,
-        assetIdentityMap: assetMap,
-        tokenStore: tokenStore,
-      });
+
+      let target: TargetAdapter;
+      if (config.target.adapter === "magento") {
+        target = new MagentoAdapter({
+          ...config.target.config,
+          retries: config.syncOptions?.retries,
+          retryDelayMs: config.syncOptions?.retryDelayMs,
+          categoryIdentityMap: categoryMap,
+          assetIdentityMap: assetMap,
+          tokenStore: tokenStore,
+        });
+      } else {
+        // Default: Vendure
+        target = new VendureAdapter({
+          ...config.target.config,
+          retries: config.syncOptions?.retries,
+          retryDelayMs: config.syncOptions?.retryDelayMs,
+          includeAttributes: config.mapping.includeAttributes,
+          excludeAttributes: config.mapping.excludeAttributes,
+          categoryIdentityMap: categoryMap,
+          assetIdentityMap: assetMap,
+          tokenStore: tokenStore,
+        });
+      }
 
       await Promise.all([source.initialize(), target.initialize()]);
 
@@ -96,10 +111,14 @@ async function main() {
         reporter: reporter,
       });
 
-      if (command === "sync-categories") {
+      if (command === "sync-schema") {
+        // ── Schema Sync: attributes → options → families → assign ─────────────────
+        await engine.syncSchema();
+      } else if (command === "sync-categories") {
+        // ── Category Sync ────────────────────────────────────────────────
         await engine.runCategorySync();
       } else {
-        // Automatic Delta Sync logic
+        // ── Product Sync ("sync" or "sync-products") ───────────────────────────
         let sinceDate: Date | undefined;
         if (values.since) {
           sinceDate = parseSinceDate(values.since);
@@ -147,14 +166,25 @@ function showHelp() {
   console.log(`
 Usage: pim-sync <command> [options]
 
+Recommended order for Magento targets:
+  pim-sync sync-schema        ← run FIRST: syncs attributes, options, families
+  pim-sync sync-categories    ← run SECOND
+  pim-sync sync-products      ← run THIRD
+
 Commands:
-  sync                 Run the product synchronization engine
-  sync-categories      Run the category/collection synchronization engine
+  sync-schema          Sync Akeneo schema to Magento (4 sub-steps):
+                         1. sync-attributes      — create Magento attributes
+                         2. sync-attribute-options — create select/multiselect options
+                         3. sync-families         — create Magento attribute sets
+                         4. assign-to-families    — assign attributes to sets
+  sync-categories      Sync the Akeneo category tree to the target
+  sync-products        Sync products and variants (alias: sync)
+  sync                 Alias for sync-products
 
 Options:
-  --since <date>      Run incremental sync since date (ISO format)
-  --dry-run, -d       Run without writing to target
-  --help, -h          Show help
+  --since <date>      Run incremental product sync since date (ISO format)
+  --dry-run, -d       Run without writing to target (safe preview)
+  --help, -h          Show this help
   `);
 }
 

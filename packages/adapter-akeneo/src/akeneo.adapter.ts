@@ -1,7 +1,10 @@
 import {
   Asset,
+  Attribute,
+  AttributeOptionsGroup,
   BasicLogger,
   Category,
+  Family,
   Product,
   SourceAdapter,
   TokenStore,
@@ -10,6 +13,8 @@ import { AkeneoClient } from "./client/akeneo.client.js";
 import { AkeneoMapper } from "./mappers/akeneo.mapper.js";
 import { AkeneoCategoryService } from "./services/akeneo-category.service.js";
 import { AkeneoProductService } from "./services/akeneo-product.service.js";
+import { AkeneoFamilyService } from "./services/akeneo-family.service.js";
+import { AkeneoAttributeService } from "./services/akeneo-attribute.service.js";
 import { AkeneoConfig } from "./types/akeneo.types.js";
 
 /**
@@ -22,6 +27,8 @@ export class AkeneoAdapter implements SourceAdapter {
   private readonly mapper: AkeneoMapper;
   private productService: AkeneoProductService;
   private categoryService: AkeneoCategoryService;
+  private familyService: AkeneoFamilyService;
+  private attributeService: AkeneoAttributeService;
   private config: AkeneoConfig;
   logger = new BasicLogger("AKN", process.env.LOG_LEVEL);
 
@@ -31,6 +38,8 @@ export class AkeneoAdapter implements SourceAdapter {
     this.mapper = new AkeneoMapper(config.locales, config.scopes);
     this.productService = new AkeneoProductService(this.client, this.mapper, this.logger);
     this.categoryService = new AkeneoCategoryService(this.client, this.mapper, this.logger);
+    this.familyService = new AkeneoFamilyService(this.client, this.logger);
+    this.attributeService = new AkeneoAttributeService(this.client, this.logger);
   }
 
   /**
@@ -64,5 +73,31 @@ export class AkeneoAdapter implements SourceAdapter {
    */
   async getCategories(): Promise<Category[]> {
     return this.categoryService.getAllCategories(this.config.categoryRootCode);
+  }
+
+  // ── Schema sync methods ─────────────────────────────────────────────────────
+
+  /**
+   * Fetches all Akeneo families (each maps to a Magento Attribute Set).
+   * Includes the full list of attribute codes per family.
+   */
+  async getFamilies(): Promise<Family[]> {
+    return this.familyService.getAllFamilies();
+  }
+
+  /**
+   * Fetches all attributes used across the given families, deduplicated.
+   * @param familyCodes - If provided, only fetches attributes from those families.
+   */
+  async getAttributes(familyCodes?: string[]): Promise<Attribute[]> {
+    return this.attributeService.getAllAttributes(familyCodes);
+  }
+
+  /**
+   * Fetches all options for the given select/multiselect attribute codes.
+   * @param attributeCodes - Codes of the select/multiselect attributes.
+   */
+  async getAttributeOptions(attributeCodes: string[]): Promise<AttributeOptionsGroup[]> {
+    return this.attributeService.getAttributeOptions(attributeCodes);
   }
 }
