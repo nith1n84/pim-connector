@@ -1,0 +1,50 @@
+{
+  "source": {
+    "adapter": "akeneo",
+    "config": {
+      "url": "${AKENEO_URL}",
+      "clientId": "${AKENEO_CLIENT_ID}",
+      "secret": "${AKENEO_SECRET}",
+      "username": "${AKENEO_USERNAME}",
+      "password": "${AKENEO_PASSWORD}",
+      "locales": ["en_US", "fr_FR", "de_DE"],
+      "scopes": ["ecommerce"]
+    }
+  },
+  "target": {
+    "adapter": "magento",
+    "config": {
+      "url": "${MAGENTO_URL}",
+      "username": "${MAGENTO_USERNAME}",
+      "password": "${MAGENTO_PASSWORD}",
+      "storeCode": "default",
+      "rootCategoryId": 2,
+      "localeMap": {
+        "en_US": "default",
+        "fr_FR": "french",
+        "de_DE": "german"
+      },
+      "familyAttributeSetMap": {
+        "clothing": "Clothing",
+        "electronics": "Electronics"
+      },
+      "defaultAttributeSetName": "Default",
+      "configurableAttributes": ["size", "color"]
+    }
+  },
+  "mapping": {
+    "attributeMap": {
+      "sku": "identifier",
+      "name": "values.name",
+      "description": "values.description"
+    },
+    "excludeAttributes": ["sku", "name", "description"]
+  },
+  "syncOptions": {
+    "delayMs": 100,
+    "retries": 3,
+    "retryDelayMs": 500,
+    "batchSize": 20,
+    "concurrency": 5
+  }
+}

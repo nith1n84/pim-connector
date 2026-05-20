@@ -52,6 +52,54 @@ export const TargetVendureSchema = z.object({
   stores: AdapterStoresSchema.optional(),
 });
 
+export const TargetMagentoSchema = z.object({
+  adapter: z.literal("magento"),
+  config: z.object({
+    url: z.url(),
+    username: z.string(),
+    password: z.string(),
+    token: z.string().optional(),
+
+    /** Default store view code for base product data. Defaults to "default". */
+    storeCode: z.string().optional(),
+
+    /**
+     * Root category ID under which all imported categories are placed.
+     * Defaults to 2 (Magento standard root).
+     */
+    rootCategoryId: z.number().optional(),
+
+    /**
+     * Maps Akeneo family codes → Magento attribute set names.
+     * Example: { "clothing": "Clothing", "electronics": "Electronics" }
+     */
+    familyAttributeSetMap: z.record(z.string(), z.string()).optional(),
+
+    /**
+     * Fallback attribute set name when family is not in familyAttributeSetMap.
+     * Defaults to "Default".
+     */
+    defaultAttributeSetName: z.string().optional(),
+
+    /**
+     * Akeneo attribute codes that are configurable axes.
+     * Example: ["size", "color"]
+     */
+    configurableAttributes: z.array(z.string()).optional(),
+
+    /**
+     * Maps Akeneo locale codes → Magento store view codes.
+     * Base product data goes to default; localized fields go per store view.
+     * Example: { "en_US": "default", "fr_FR": "french", "de_DE": "german" }
+     */
+    localeMap: z.record(z.string(), z.string()).optional(),
+
+    retries: z.number().optional(),
+    retryDelayMs: z.number().optional(),
+  }),
+  stores: AdapterStoresSchema.optional(),
+});
+
 export const MappingSchema = z.object({
   attributeMap: z
     .record(
@@ -84,12 +132,13 @@ export const SyncOptionsSchema = z.object({
 
 export const ConnectorConfigSchema = z.object({
   source: SourceAkeneoSchema,
-  target: TargetVendureSchema,
+  target: TargetVendureSchema.or(TargetMagentoSchema),
   mapping: MappingSchema,
   syncOptions: SyncOptionsSchema.optional(),
 });
 
 export type ConnectorConfig = z.infer<typeof ConnectorConfigSchema>;
+export type TargetMagentoConfig = z.infer<typeof TargetMagentoSchema>["config"];
 
 /**
  * Validates the configuration object against the schema.
