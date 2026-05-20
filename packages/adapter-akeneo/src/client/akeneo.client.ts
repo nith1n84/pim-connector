@@ -289,10 +289,19 @@ export class AkeneoClient {
   /**
    * Fetches products based on pagination and last update date.
    */
-  async getProducts(page: number, limit: number, updatedDate?: Date): Promise<Page<AkeneoProduct>> {
-    const search = updatedDate
-      ? { updated: [{ operator: ">" as const, value: formatAkeneoDate(updatedDate) }] }
-      : {};
+  async getProducts(
+    page: number,
+    limit: number,
+    updatedDate?: Date,
+    identifiers?: string[],
+  ): Promise<Page<AkeneoProduct>> {
+    const search: any = {};
+    if (updatedDate) {
+      search.updated = [{ operator: ">" as const, value: formatAkeneoDate(updatedDate) }];
+    }
+    if (identifiers && identifiers.length > 0) {
+      search.identifier = [{ operator: "IN" as const, value: identifiers }];
+    }
     return this.fetchPage<AkeneoProduct>("/api/rest/v1/products", page, limit, {
       with_count: true,
       search: JSON.stringify(search),
