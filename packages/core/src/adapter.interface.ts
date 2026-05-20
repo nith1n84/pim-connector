@@ -10,7 +10,12 @@ import {
 export interface SourceAdapter {
   name: string;
   initialize(): Promise<void>;
-  fetchProducts(page: number, limit: number, since?: Date): Promise<Product[]>;
+  fetchProducts(
+    page: number,
+    limit: number,
+    since?: Date,
+    identifiers?: string[],
+  ): Promise<Product[]>;
   getProduct(id: string): Promise<any | null>;
   getAssets(): Promise<any[]>;
   getCategories(): Promise<Category[]>;

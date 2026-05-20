@@ -1,5 +1,6 @@
 import { parseArgs } from "node:util";
 import { dirname, join } from "node:path";
+import { readFile } from "node:fs/promises";
 import {
   BasicLogger,
   FileStorageProvider,
@@ -23,6 +24,7 @@ async function main() {
   const args = parseArgs({
     options: {
       since: { type: "string" },
+      file: { type: "string", short: "f" },
       "dry-run": { type: "boolean", short: "d" },
       help: { type: "boolean", short: "h" },
     },
@@ -161,6 +163,28 @@ async function main() {
       } else if (command === "sync-categories") {
         // ── Category Sync ────────────────────────────────────────────────
         await engine.runCategorySync();
+      } else if (values.file) {
+        const filePath = join(process.env.INIT_CWD || process.cwd(), values.file);
+        logger.info(`Reading target product SKUs from file: ${filePath}`);
+        const content = await readFile(filePath, "utf8");
+        const ids = content
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter((line) => line.length > 0);
+
+        if (ids.length === 0) {
+          logger.warn("Provided file is empty or contains no valid SKUs. Skipping sync.");
+        } else {
+          await engine.syncProductsByIds(ids);
+        }
+
+        // Update state on success if not a dry-run (you may skip state update for targeted sync, but we update lastRunStartTime for consistency)
+        if (!values["dry-run"]) {
+          await stateManager.updateState({
+            lastRunStartTime: runStartTime.toISOString(),
+            lastSuccessfulRun: new Date().toISOString(),
+          });
+        }
       } else {
         // ── Product Sync ("sync" or "sync-products") ───────────────────────────
         let sinceDate: Date | undefined;
@@ -226,9 +250,10 @@ Commands:
   sync                 Alias for sync-products
 
 Options:
-  --since <date>      Run incremental product sync since date (ISO format)
-  --dry-run, -d       Run without writing to target (safe preview)
-  --help, -h          Show this help
+  --since <date>      Run incremental sync since date (ISO format)
+  --file <path>, -f   Sync specific products from a file (1 SKU per line)
+  --dry-run, -d       Run without writing to target
+  --help, -h          Show help
   `);
 }
 

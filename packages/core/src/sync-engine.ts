@@ -189,6 +189,54 @@ export class SyncEngine {
   }
 
   /**
+   * Runs a product synchronization for specific product IDs.
+   * @param ids - Array of product IDs (SKUs) to sync.
+   */
+  async syncProductsByIds(ids: string[]): Promise<void> {
+    this.logger.info(
+      `Starting targeted product sync: ${this.source.name} -> ${this.target.name} for ${ids.length} products`,
+    );
+
+    let successCount = 0;
+    let errorCount = 0;
+    let totalFetched = 0;
+
+    try {
+      const batchSize = this.options.batchSize || 10;
+
+      // Split ids into chunks
+      const chunks: string[][] = [];
+      for (let i = 0; i < ids.length; i += batchSize) {
+        chunks.push(ids.slice(i, i + batchSize));
+      }
+
+      for (const chunk of chunks) {
+        let page = 1;
+        while (true) {
+          const products = await this.source.fetchProducts(page, batchSize, undefined, chunk);
+          if (products.length === 0) break;
+
+          totalFetched += products.length;
+          this.logger.info(`Fetched batch of ${products.length} products (Total: ${totalFetched})`);
+
+          const batchResults = await this.processProductBatch(products);
+          successCount += batchResults.success;
+          errorCount += batchResults.error;
+
+          if (products.length < batchSize) break;
+          page++;
+        }
+      }
+
+      await this.identityMap.save();
+      this.printSummary("targeted", totalFetched, successCount, errorCount);
+    } catch (error) {
+      this.logger.error("Targeted sync failed:", error);
+      throw error;
+    }
+  }
+
+  /**
    * Runs a category synchronization.
    */
   async runCategorySync(): Promise<void> {

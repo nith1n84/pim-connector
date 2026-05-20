@@ -50,8 +50,13 @@ export class AkeneoAdapter implements SourceAdapter {
     this.logger.info(`Akeneo Adapter initialized `);
   }
 
-  async fetchProducts(page: number, limit: number, since?: Date): Promise<Product[]> {
-    return this.productService.fetchProducts(page, limit, since);
+  async fetchProducts(
+    page: number,
+    limit: number,
+    since?: Date,
+    identifiers?: string[],
+  ): Promise<Product[]> {
+    return this.productService.fetchProducts(page, limit, since, identifiers);
   }
 
   /**

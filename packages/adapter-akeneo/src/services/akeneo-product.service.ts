@@ -31,8 +31,14 @@ export class AkeneoProductService {
    * Fetches products from Akeneo and maps them to CDM format.
    * Handles both simple products and complex variant structures.
    */
-  async fetchProducts(page: number, limit: number, updatedDate?: Date): Promise<Product[]> {
-    const akeneoProducts = (await this.client.getProducts(page, limit, updatedDate)).data;
+  async fetchProducts(
+    page: number,
+    limit: number,
+    updatedDate?: Date,
+    identifiers?: string[],
+  ): Promise<Product[]> {
+    const akeneoProducts = (await this.client.getProducts(page, limit, updatedDate, identifiers))
+      .data;
     if (akeneoProducts.length === 0) return [];
 
     // 1. Group products by family for bulk metadata retrieval
