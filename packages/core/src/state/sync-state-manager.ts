@@ -10,7 +10,7 @@ export interface SyncState {
  * Service for managing synchronization state (e.g., last run time, job locks).
  */
 export class SyncStateManager {
-  private readonly stateKey = ".sync-data/sync-state.json";
+  private readonly stateKey = "sync-state.json";
 
   constructor(private readonly provider: StorageProvider) {}
 

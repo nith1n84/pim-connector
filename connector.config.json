@@ -9,6 +9,32 @@
       "password": "${AKENEO_PASSWORD}",
       "locales": ["en_GB", "ar_KW"],
       "scopes": ["ecommerce", "xcite"]
+    },
+    "stores": {
+      "token": {
+        "type": "local",
+        "config": {
+          "baseDir": "./.sync-data/akeneo/tokens"
+        }
+      },
+      "mapping": {
+        "type": "local",
+        "config": {
+          "baseDir": "./.sync-data/akeneo/mappings"
+        }
+      },
+      "syncState": {
+        "type": "local",
+        "config": {
+          "baseDir": "./.sync-data/akeneo/sync-state"
+        }
+      },
+      "syncReporter": {
+        "type": "local",
+        "config": {
+          "baseDir": "./.sync-data/reports/akeneo"
+        }
+      }
     }
   },
   "target": {
@@ -24,6 +50,14 @@
       "channelMap": {
         "ecommerce": "2",
         "xcite": "4"
+      }
+    },
+    "stores": {
+      "token": {
+        "type": "local",
+        "config": {
+          "baseDir": "./.sync-data/vendure/tokens"
+        }
       }
     }
   },
